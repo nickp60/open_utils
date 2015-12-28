@@ -7,7 +7,7 @@ Created on Tue Feb 24 13:39:09 2015
 ##################               Brinsmade Lab                #################
 @author: Nick Waters
 
-#                             Version 3.1
+#                             Version 3.2
 #                               20151217
 #
 #   About:  this script is essentially a wrapper for NCBI BLAST+, the 
@@ -73,7 +73,7 @@ if os.path.exists(subdirname): pass
 else:
     print("Making directory %s..." % subdirname)
     os.makedirs(subdirname)
-input_handle = open(input_genome,"rU") #  input database
+input_handle = open(input_genome,"r") #  input database
 aaoutput_handle = open(os.path.join(subdirname, gb+"aa.fasta"),"w") #  #  Amino Acid output
 aaoutput_path=os.path.join(subdirname, gb+"aa.fasta")  #  Amino Acid output path
 #test_path= "../testFasta.fasta"
@@ -92,17 +92,20 @@ for rec in SeqIO.parse(input_handle, "genbank"):
         for feature in rec.features:
             if feature.type == "CDS":
                 for qual in feature.qualifiers["locus_tag"]:
-                    gll[qual] = (str(feature.qualifiers["product"]).replace("\'", "").replace("[", "",).replace("]", ""),
+                    try:
+                        gll[qual]=(str(feature.qualifiers["old_locus_tag"]).replace("\'", "").replace("[", "",).replace("]", ""),
+                        str(feature.qualifiers["product"]).replace("\'", "").replace("[", "",).replace("]", ""),
                         str(feature.qualifiers["protein_id"]).replace("\'", "").replace("[", "",).replace("]", ""), 
                         str(feature.qualifiers["db_xref"]).replace("\'", "").replace("[", "",).replace("]", ""), 
                         str(feature.location.extract(rec).seq),
                         str(feature.qualifiers["translation"]).replace("\'", "").replace("[", "",).replace("]", "") )              
-                    
+                    except KeyError:
+                        gll[qual] = "pseudo" 
 #%%      shake it out from wide to tall data, sanity check, and 
 #       set up recipient structures
 gl=gll.transpose()  # genbank List
 gl.reset_index(level=0, inplace=True)  # make numeric index
-gl.columns=('locus_tag', 'product', 'protein_id', 'db_xref','sequence', "aaseq") # name dem cols
+gl.columns=('locus_tag', 'old_locus_tag','product', 'protein_id', 'db_xref','sequence', "aaseq") # name dem cols
     
 #print(gl.loc[gl['locus_tag'] == 'QV15_00005'])   ### just a test      
 
@@ -143,6 +146,7 @@ def preparefor_blastaa(x):
         a=Seq(str(row['aaseq']), IUPAC.protein)
         b=SeqRecord(seq=a, id= row['locus_tag'],
                     description=row['protein_id']+
+                    "|"+row['old_locus_tag']+
                     '|'+row['product'])
         aaseqDict[index]=b ### just for funsies, in case you want a dictionary
         aaseqList.append(b)
