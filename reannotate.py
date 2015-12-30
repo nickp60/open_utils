@@ -3,7 +3,7 @@
 """
 Created on Tue Feb 24 13:39:09 2015
 ######################## Database Re-Annotation Tool ##########################
-#####################         By Nick Waters 2015         #####################
+#####################         By Nick Waters 2015        ######################
 ##################               Brinsmade Lab                #################
 @author: Nick Waters
 
@@ -87,20 +87,33 @@ finaldbcsv_path=os.path.join(subdirname,gb+"_with_"+bdb_name+"anno.csv") #  Fina
     #  See the bioPython manual to add more fields here if desired
 gll=pd.DataFrame()  ## genbank List Long
 print(str("Reading .gb file..."))
-for rec in SeqIO.parse(input_handle, "genbank"):
+ 
+for rec in SeqIO.parse(input_handle, "genbank"): 
     if rec.features:
         for feature in rec.features:
             if feature.type == "CDS":
                 for qual in feature.qualifiers["locus_tag"]:
-                    try:
-                        gll[qual]=(str(feature.qualifiers["old_locus_tag"]).replace("\'", "").replace("[", "",).replace("]", ""),
-                        str(feature.qualifiers["product"]).replace("\'", "").replace("[", "",).replace("]", ""),
-                        str(feature.qualifiers["protein_id"]).replace("\'", "").replace("[", "",).replace("]", ""), 
-                        str(feature.qualifiers["db_xref"]).replace("\'", "").replace("[", "",).replace("]", ""), 
-                        str(feature.location.extract(rec).seq),
-                        str(feature.qualifiers["translation"]).replace("\'", "").replace("[", "",).replace("]", "") )              
-                    except KeyError:
-                        gll[qual] = "pseudo" 
+                    if rec.features[4].qualifiers.has_key("old_locus_tag"):
+                        try: 
+                            gll[qual]=(str(feature.qualifiers["old_locus_tag"]).replace("\'", "").replace("[", "",).replace("]", ""),
+                            str(feature.qualifiers["product"]).replace("\'", "").replace("[", "",).replace("]", ""),
+                            str(feature.qualifiers["protein_id"]).replace("\'", "").replace("[", "",).replace("]", ""), 
+                            str(feature.qualifiers["db_xref"]).replace("\'", "").replace("[", "",).replace("]", ""), 
+                            str(feature.location.extract(rec).seq),
+                            str(feature.qualifiers["translation"]).replace("\'", "").replace("[", "",).replace("]", "") )              
+                        except KeyError:
+                            gll[qual] = "pseudo" 
+                    else: 
+                        try: 
+                            gll[qual]=(str("none"),
+                            str(feature.qualifiers["product"]).replace("\'", "").replace("[", "",).replace("]", ""),
+                            str(feature.qualifiers["protein_id"]).replace("\'", "").replace("[", "",).replace("]", ""), 
+                            str(feature.qualifiers["db_xref"]).replace("\'", "").replace("[", "",).replace("]", ""), 
+                            str(feature.location.extract(rec).seq),
+                            str(feature.qualifiers["translation"]).replace("\'", "").replace("[", "",).replace("]", "") )              
+                        except KeyError:
+                            gll[qual] = "pseudo" 
+
 #%%      shake it out from wide to tall data, sanity check, and 
 #       set up recipient structures
 gl=gll.transpose()  # genbank List
@@ -120,11 +133,14 @@ aaseqList=[]
 
 def preparefor_blastn(x):    
     for content in x.itertuples():
-        a=Seq(str(content[5]), IUPAC.unambiguous_dna)
+        a=Seq(str(content[6]), IUPAC.unambiguous_dna)
 #### clean up, clean up, all the brackets everywhere    
         b=SeqRecord(seq=a, id= content[1],
-                    description=str(content[2]).replace("\'", "").replace("[", "",).replace("]", "")+
-                    '|'+str(content[3]).replace("\'", "").replace("[", "",).replace("]", ""))
+                    description=str(
+                    "|"+str(content[2]).replace("\'", "").replace("[", "",).replace("]", "")+
+                    '|'+str(content[3]).replace("\'", "").replace("[", "",).replace("]", "")+
+                    '|'+str(content[4]).replace("\'", "").replace("[", "",).replace("]", "")+
+                    '|'+str(content[5]).replace("\'", "").replace("[", "",).replace("]", "")))
         nseqList.append(b)
 #%%
 if nuc_flag=="T":
@@ -145,9 +161,11 @@ def preparefor_blastaa(x):
                 print("warning!  Duplicate %s entry" %locus_tag)
         a=Seq(str(row['aaseq']), IUPAC.protein)
         b=SeqRecord(seq=a, id= row['locus_tag'],
-                    description=row['protein_id']+
+                    description=str(
                     "|"+row['old_locus_tag']+
-                    '|'+row['product'])
+                    "|"+row['product']+
+                    '|'+row['protein_id']+
+                    '|'+row['db_xref']))
         aaseqDict[index]=b ### just for funsies, in case you want a dictionary
         aaseqList.append(b)
 preparefor_blastaa(gl)

@@ -36,6 +36,8 @@
 #source.file = "~/GitHub/BlastDBs/N315.gb"
 #source.file = "~/GitHub/Py/umas1.gb"
 #source.file ="~/GitHub/BlastDBs/FPR3757_LAC.gb"
+#source.file ="~/GitHub/BlastDBs/TCH1516.gb"
+
 #
 
 
@@ -48,21 +50,29 @@ if (is.na(args[2])){
   working_dir<-paste(cur_dir,"/", gsub("-","",Sys.Date()),"gbparseR","/", sep="")
   if (!dir.exists(working_dir)){dir.create(working_dir)}
   setwd(working_dir)
-} else{
-  output_path<-args[2]
-  if (!dir.exists(output_path)){dir.create(output_path)}
-  setwd(output_path)
-  working_dir<-output_path
+} else if (is.numeric(args[2])){
+  stop("cannot give region width without an output directory")
+} else {
+    output_path<-args[2]
+    if (!dir.exists(output_path)){dir.create(output_path)}
+      setwd(output_path)
+      working_dir<-output_path
 }
 
-
-if (is.na(args[3]) | !is.numeric(args[3]) ){
-    upstream<-500
+if (is.na(args[3]) | is.na(as.numeric(args[3]))){
+  print( "using 500bp as region width")
+  upstream<-500
 } else{
   upstream<-as.numeric(args[3])
 }
 downstream<-upstream #same upstream as downstream.  need more flexibility? figure it out..
 
+#  sanity check:
+print(paste("genome source file: ", source.file))
+print(paste("output directory: ", working_dir))
+print(paste("upsteam and downstream region width: ", upstream))
+
+#
 
 ################################################################################
 ####  Extract each scaffold and write out to files in a new 
@@ -202,7 +212,7 @@ extract_features<-function(data, ranges, locus_tag="locus_tag", debug=F){ #y=gre
     entry<-data[ranges[ranges$id==i,"index"]:ranges[ranges$id==j,"index"]]
     entry_head<-entry[1:entry_end]
     #}#  quick check
-    if(!any(grepl("source|repeat_region|STS|assembly_gap|misc_feature|misc_binding|CDS|misc_RNA|rRNA|tRNA", 
+    if(!any(grepl("source|repeat_region|STS|tmRNA|assembly_gap|misc_feature|misc_binding|CDS|misc_RNA|rRNA|ncRNA|tRNA", 
                   entry_head))){
       if(any(grepl("pseudo", entry))){
         print(paste("caution! id = ", i, "is possibly a pseudogene"))
@@ -299,7 +309,7 @@ extract_features<-function(data, ranges, locus_tag="locus_tag", debug=F){ #y=gre
       #####
       #   cant use the normal entry_head because occasionally other entries will 
       #   say "rRNA" in header
-    } else if(any(grepl("rRNA", entry[c(1,3)]))){
+    } else if(any(grepl("rRNA", entry[c(1,entry_end)]))){
       z[z$id==i, "type"]<-"rRNA"
       pre_locus<-gsub(paste("(.*\\s*\\",locus_tag,"=)(.*)(\")", sep=""),"\\2", 
                       grep(locus_tag,entry, value=T )[1])
@@ -381,6 +391,28 @@ extract_features<-function(data, ranges, locus_tag="locus_tag", debug=F){ #y=gre
       try(z[z$id==i, "gene"]<-
             gsub("(.*\\s*\\gene=\")(.*)(\")","\\2", 
                  grep("gene=",entry, value=T )[1]), silent=T)
+    } else if(any(grepl("ncRNA", entry_head))){
+      z[z$id==i, "type"]<-"ncRNA"
+      try(z[z$id==i, "product"]<-
+            gsub("(.*\\s*/product=)(\")(.*)(\")","\\3", grep("product",entry, value=T )),
+          silent=T)
+      try(z[z$id==i, "old_locus_tag"]<-
+            gsub("(.*\\s*\\old_locus_tag=\")(.*)(\")","\\2", 
+                 grep("old_locus_tag=",entry, value=T )[1]), silent=T)
+      try(z[z$id==i, "gene"]<-
+            gsub("(.*\\s*\\gene=\")(.*)(\")","\\2", 
+                 grep("gene=",entry, value=T )[1]), silent=T)
+    } else if(any(grepl("tmRNA", entry_head))){
+      z[z$id==i, "type"]<-"tmRNA"
+      try(z[z$id==i, "product"]<-
+            gsub("(.*\\s*/product=)(\")(.*)(\")","\\3", grep("product",entry, value=T )),
+          silent=T)
+      try(z[z$id==i, "old_locus_tag"]<-
+            gsub("(.*\\s*\\old_locus_tag=\")(.*)(\")","\\2", 
+                 grep("old_locus_tag=",entry, value=T )[1]), silent=T)
+      try(z[z$id==i, "gene"]<-
+            gsub("(.*\\s*\\gene=\")(.*)(\")","\\2", 
+                 grep("gene=",entry, value=T )[1]), silent=T)
     } else if(any(grepl("STS", entry_head))){
       z[z$id==i, "type"]<-"STS"
       try(z[z$id==i, "db_xref"]<-
@@ -435,12 +467,12 @@ get_seqs<-function(gbdf, seq, upstream=500, downstream=500){
   gbdf$region<-paste(gbdf$dnaseq_upstream, toupper(gbdf$dnaseq), gbdf$dnaseq_downstream, sep="")
   gbdf$search_region<-
     ifelse(gbdf$direction=="leading",
-           paste(gbdf$dnaseq_upstream, toupper(substr(gbdf$dnaseq, 1, 15)), sep=""),
-           paste(toupper(substr(gbdf$dnaseq, nchar(gbdf$dnaseq)-15, nchar(gbdf$dnaseq))), gbdf$dnaseq_downstream, sep=""))
-  gbdf$prom_region<-
+           paste(gbdf$dnaseq_upstream, toupper(substr(gbdf$dnaseq, 1, 50)), sep=""),
+           paste(toupper(substr(gbdf$dnaseq, nchar(gbdf$dnaseq)-50, nchar(gbdf$dnaseq))), gbdf$dnaseq_downstream, sep=""))
+  gbdf$prom_region<- 
     ifelse(gbdf$direction=="leading",
-           paste(gbdf$dnaseq_upstream, toupper(substr(gbdf$dnaseq, 1, 200)), sep=""),
-           paste(toupper(substr(gbdf$dnaseq, nchar(gbdf$dnaseq)-200, nchar(gbdf$dnaseq))), gbdf$dnaseq_downstream, sep=""))
+           paste(substr(gbdf$dnaseq_upstream,   1, (nchar(gbdf$dnaseq_upstream)-15)), sep=""),
+           paste(substr(gbdf$dnaseq_downstream, 15, nchar(gbdf$dnaseq_downstream)), sep=""))
   gbdf
 }
 #^^^^^^^^^ 
