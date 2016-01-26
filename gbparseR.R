@@ -5,18 +5,18 @@
 #                           gbparseR
 #
 #                         by Nick Waters
-#                           20151215
-#                         Version 0.3.5
+#                           20160126
+#                         Version 0.3.6
 ################################################################################
 ################################################################################
 
 #   Usage: $ Rscript gbparseR.R input.gb  output_path *upstream_ and_downstream_bps
 #                                                     *optional
 
-# Minor update 0.3.5: 
-#  -changed underscores to periods in version name
-#  -made command line executable
-#  - got rid of a lot of commented garbage
+# Minor update 0.3.6: 
+# added output as gff
+# added output as fasta
+# fixed clean_sequlences function to end at "//"
 
 # Cant have upstream region definitions and no output path.  you will break it. :(
 
@@ -34,7 +34,7 @@
 #Test files
 #source.file = "~/GitHub/BlastDBs/CP000253_8325.gb"
 #source.file = "~/GitHub/BlastDBs/N315.gb"
-#source.file = "~/GitHub/Py/umas1.gb"
+#source.file = "~/GitHub/BlastDBs/uams1.gb"
 #source.file ="~/GitHub/BlastDBs/FPR3757_LAC.gb"
 #source.file ="~/GitHub/BlastDBs/TCH1516.gb"
 
@@ -84,14 +84,21 @@ split_if_scaffolded<-function(source.file){
 #    scaffs<-length(grep("LOCUS", input))
     scaffCoords<-c(grep("LOCUS", input), length(input))
     for( i in 1:(length(scaffCoords)-1)){#print(i)}
-      scaffFileName<-paste("scaf_", i, ".txt", sep="")
+      scaf<-
+        gsub(" *","",
+             gsub("VERSION (.*) (.*)","\\1", grep("VERSION", input, value = T)[i]))
+      scaffFileName<-paste(scaf,"_scaf_", i, ".txt", sep="")
       ifelse (i==1,
               splitInput<-input[scaffCoords[i]:scaffCoords[i+1]-1],
               splitInput<-input[scaffCoords[i]:scaffCoords[i+1]])
+      print(scaffFileName)
       write(splitInput, scaffFileName)
     }
   } else{
-      write(input, "scaf_1.txt")
+    scaf<-gsub(" *","", 
+               gsub("VERSION (.*) (.*)","\\1", grep("VERSION", input, value = T)))
+    print(paste("saving formatted scaffold:",paste(scaf, "_scaf_1.txt", sep="")))
+    write(input, paste(scaf, "_scaf_1.txt", sep=""))
     }
 }
 #^^^^^^^^^  
@@ -124,6 +131,7 @@ clean_sequence<-function(seq){#} (seq in grep("seq\\d", ls(), value=T)){#print(s
   fullraw<-seq #get(seq)
   nospace<-gsub("\\s", "",fullraw[2:length(fullraw)])
   nonum<-paste(gsub("\\d", "",nospace), sep="", collapse="")
+  nonum<-gsub("(.*)(//.*)","\\1",nonum)
   nonum
 }
 
@@ -485,19 +493,24 @@ get_seqs<-function(gbdf, seq, upstream=500, downstream=500){
 #  UPDATE this, as of 20151208, works with uams-1 genome with 2 scaffolds.
 
 split_if_scaffolded(source.file)
-grep("scaf.+", dir(), value=T)
 print(paste("Found ",length(grep("scaf.*", dir())),
             " scaffold(s) in the current directory: (", getwd(), ")", sep=""))
+print(grep("scaf.+", dir(), value=T))
+
 scafList<-as.list(grep("scaf.*", dir(), value=T))
 #for( i in grep("scaf.*", dir(), value=T)){
 #resultsAll<-  lapply(scafList, function(i){
+fastaString<-""
 resultsEachScaf<-  lapply(scafList, function(i){
-  #i=scafList[1]
+  #i=scafList[2]
   #i=source.file
   i=unlist(i)
   outName<-gsub("(.*)(\\.txt)","\\1", i )
   returns<-load_gb(i)
   returns[[3]]<-clean_sequence(seq = returns[[3]])
+  ###  give a fasta
+#  seqs<-clean_sequence(seq = returns[[3]])
+  #
   ranges<-get_ranges(returns[[2]])
   ranges<-clean_ranges_rna(ranges, returns[[2]])
   ranges<-extract_features(data=returns[[2]],ranges =  ranges,locus_tag = "locus_tag")
@@ -506,7 +519,24 @@ resultsEachScaf<-  lapply(scafList, function(i){
   return(result)
   }
 )
+sequences<-  lapply(scafList, function(i){
+  #i=scafList[2]
+  #i=source.file
+  i=unlist(i)
+  outName<-gsub("(.*)(\\.txt)","\\1", i )
+  returns<-load_gb(i)
+  seqs<-clean_sequence(seq = returns[[3]])
+  out<-list(i, seqs)
+  return(out)
+})
+for( i in sequences)
+fastaString<-paste(fastaString, 
+                   paste(">", i, sep=''),
+                   paste(strwrap(seqs,80), collapse="\n"),
+                   collapse="\n")
 
+
+##
 if(length(resultsEachScaf)>1){
   finalDF<-
     resultsEachScaf[[1]]
@@ -522,5 +552,37 @@ for (fn in scafList){
 if (file.exists(fn)) {file.remove(fn)}}
 input_name<-gsub("(.*)(\\.gb)","\\1", gsub("(.*)(\\/)(.*\\.gb)", "\\3", source.file))
 write.csv(finalDF, paste(working_dir, input_name, ".csv", sep=""))
+
+####  make a GFF3 file
+attributes<-paste(
+  "ID=",finalDF$locus_tag,
+  ";Name=", finalDF$gene, 
+  ";Alias=", finalDF$old_locus_tag, 
+  ";Parent=",
+  ";Target=", 
+  ";Gap=", 
+  ";Derives_from=", 
+  ";Note=", 
+  ";Dbxref=", finalDF$db_xref,
+  ";Ontology_term=", 
+  ";Is_circular=",
+  sep='')
+gtt3df<-data.frame("seqid"     = finalDF$scaffold,
+                   "source"    ="Genbank via gbParse.R",
+                   "type"      = finalDF$type,
+                   "start"     = finalDF$loc_start,
+                   "end"       = finalDF$loc_end,
+                   "score"     = ".",
+                   "strand"    = ifelse(finalDF$direction=="leading", "+","-"),
+                   "phase"     = "0",
+                   "attributes"= attributes)
+exclude<-c("misc_feature","misc_binding","assembly_gap","source")  
+gtt3df<-gtt3df[!(gtt3df$type %in% exclude),]                
+
+write.table(x = gtt3df, 
+            file = paste(working_dir, input_name, ".gff", sep=""), 
+            sep="\t")
+
+
 
 
