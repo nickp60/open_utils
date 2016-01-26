@@ -6,17 +6,16 @@
 #
 #                         by Nick Waters
 #                           20160126
-#                         Version 0.3.6
+#                         Version 0.3.7
 ################################################################################
 ################################################################################
 
 #   Usage: $ Rscript gbparseR.R input.gb  output_path *upstream_ and_downstream_bps
 #                                                     *optional
 
-# Minor update 0.3.6: 
-# added output as gff
-# added output as fasta
-# fixed clean_sequlences function to end at "//"
+# Minor update 0.3.7: 
+# fixed output as gff to have a header for each scaffold
+
 
 # Cant have upstream region definitions and no output path.  you will break it. :(
 
@@ -37,7 +36,8 @@
 #source.file = "~/GitHub/BlastDBs/uams1.gb"
 #source.file ="~/GitHub/BlastDBs/FPR3757_LAC.gb"
 #source.file ="~/GitHub/BlastDBs/TCH1516.gb"
-
+#source.file ="~/GitHub/BlastDBs/subtilis168.gb"
+working_dir<-"../gbparse_output/"
 #
 
 
@@ -223,7 +223,7 @@ extract_features<-function(data, ranges, locus_tag="locus_tag", debug=F){ #y=gre
     if(!any(grepl("source|repeat_region|STS|tmRNA|assembly_gap|misc_feature|misc_binding|CDS|misc_RNA|rRNA|ncRNA|tRNA", 
                   entry_head))){
       if(any(grepl("pseudo", entry))){
-        print(paste("caution! id = ", i, "is possibly a pseudogene"))
+        print(paste("caution! id =", i, "is possibly a pseudogene"))
       } else {
         print(paste(" uh oh...  we got a rogue entry:",i,". Skipping..."))
         next()
@@ -500,7 +500,7 @@ print(grep("scaf.+", dir(), value=T))
 scafList<-as.list(grep("scaf.*", dir(), value=T))
 #for( i in grep("scaf.*", dir(), value=T)){
 #resultsAll<-  lapply(scafList, function(i){
-fastaString<-""
+#fastaString<-""
 resultsEachScaf<-  lapply(scafList, function(i){
   #i=scafList[2]
   #i=source.file
@@ -531,9 +531,12 @@ sequences<-  lapply(scafList, function(i){
 })
 
 ##################  from seqinR
+c2s<-function (chars = c("m", "e", "r", "g", "e", "d")) {
+  return(paste(chars, collapse = ""))
+}
+
 write.fasta<-function (sequences, names, file.out, open = "w", nbchar = 60, 
-            as.string = FALSE) 
-  {
+            as.string = FALSE) {
     outfile <- file(description = file.out, open = open)
     write.oneseq <- function(sequence, name, nbchar, as.string) {
       writeLines(paste(">", name, sep = ""), outfile)
@@ -562,64 +565,267 @@ write.fasta<-function (sequences, names, file.out, open = "w", nbchar = 60,
     close(outfile)
 }
 ##################
-fastanames<-for (i in sequences){
-  return(i[1])
-}
-fastaseqs<-for (i in sequences){
-  return(i[2])
-}
-write.fasta(names = fastanames,sequences =fastaseqs ,
-            file.out =  paste(working_dir, input_name, ".fasta", sep=""))
-##
+# fastanames<-list()
+# fastaseqs <-list()
+# for (i in 1:length(sequences)){
+#   fastanames[i]<-sequences[[i]][1]
+#   fastaseqs [i]<-sequences[[i]][2]
+# }
 
+
+
+# if(length(resultsEachScaf)>1){
+#   finalDF<-
+#     resultsEachScaf[[1]]
+#   for( i in 2:length(resultsEachScaf)){
+#     interm<-resultsEachScaf[[i]]
+#     finalDF<-rbind(finalDF, interm)
+#   }
+# } else{
+#   finalDF<-resultsEachScaf[[1]]
+# }
+# # #  And they all lived happily ever after
+# # for (fn in scafList){
+# # if (file.exists(fn)) {file.remove(fn)}}
+# # input_name<-gsub("(.*)(\\.gb)","\\1", gsub("(.*)(\\/)(.*\\.gb)", "\\3", source.file))
+# # write.csv(finalDF, paste(working_dir, input_name, ".csv", sep=""))
+input_name<-gsub("(.*)(\\.gb)","\\1", gsub("(.*)(\\/)(.*\\.gb)", "\\3", source.file))
+exclude<-c("misc_feature","misc_RNA","misc_binding","assembly_gap","source")  
+
+####  make a GFF3 file
 if(length(resultsEachScaf)>1){
-  finalDF<-
-    resultsEachScaf[[1]]
+  finalDF<-  resultsEachScaf[[1]]
+  attributes<-paste(
+    "ID=",finalDF$type,":",finalDF$locus_tag,
+    ";Name=", finalDF$gene, 
+    ";Alias=", finalDF$old_locus_tag, 
+    # ";Parent=",
+    # ";Target=",
+    # ";Gap=",
+    # ";Derives_from=",
+    # ";Note=",
+    ";Dbxref=", finalDF$db_xref,
+    # ";Ontology_term=", 
+    # ";Is_circular=",
+    sep='')
+  attributesGTF<-paste(
+    'gene_id "',finalDF$locus_tag,'";',
+    'transcript_id "', finalDF$locus_tag, '";',
+   sep='')
+  gff3df<-data.frame("seqid"     = finalDF$scaffold,
+                     "source"    ="Genbank via gbParse.R",
+                     "type"      = finalDF$type,
+                     "start"     = finalDF$loc_start,
+                     "end"       = finalDF$loc_end,
+                     "score"     = ".",
+                     "strand"    = ifelse(finalDF$direction=="leading", "+","-"),
+                     "phase"     = "0",
+                     "attributes"= attributes)
+  gtfdf<-data.frame("seqid"     = finalDF$scaffold,
+                     "source"    ="Genbank via gbParse.R",
+                     "type"      = finalDF$type,
+                     "start"     = finalDF$loc_start,
+                     "end"       = finalDF$loc_end,
+                     "score"     = ".",
+                     "strand"    = ifelse(finalDF$direction=="leading", "+","-"),
+                     "frame"     = "0",
+                     "attributes"= attributesGTF)
+  mainHeaderA<-"##gff-version 3"
+  scafHeaderA<-paste("##sequence-region",gff3df[1,"seqid"], 1,gff3df[1,"end"], sep=" ")
+  gff3df<-gff3df[!(gff3df$type %in% exclude),] 
+  gtfdf<-gtfdf[!(gtfdf$type %in% exclude),] 
+  print(paste("writing gff file:", paste(working_dir, input_name, ".gff", sep="")))
+  
+  writeLines(text=paste(c(mainHeaderA,scafHeaderA),sep = "\n"),
+             con =  paste(working_dir, input_name, ".gff", sep=""))
+  write.table(x = gff3df, 
+              append = T,
+              col.names = F,row.names = F,
+              file = paste(working_dir, input_name, ".gff", sep=""), 
+              sep="\t", quote = F)
+  write.table(x = gtfdf, 
+              append = F,
+              col.names = F,row.names = F,
+              file = paste(working_dir, input_name, ".gtf", sep=""), 
+              sep="\t", quote = F)
+######################################################################## 
   for( i in 2:length(resultsEachScaf)){
     interm<-resultsEachScaf[[i]]
     finalDF<-rbind(finalDF, interm)
+    attributes<-paste(
+      "ID=",interm$type,":",interm$locus_tag,
+      ";Name=", interm$gene, 
+      ";Alias=", interm$old_locus_tag, 
+      # ";Parent=",
+      # ";Target=", 
+      # ";Gap=", 
+      # ";Derives_from=", 
+      # ";Note=", 
+      ";Dbxref=", interm$db_xref,
+      # ";Ontology_term=",
+      # ";Is_circular=",
+      sep='')
+    attributesGTF<-paste(
+      'gene_id "',interm$locus_tag,'";',
+      'transcript_id "', interm$locus_tag, '";',
+      sep='')
+    gff3df<-data.frame("seqid"     = interm$scaffold,
+                       "source"    ="Genbank via gbParse.R",
+                       "type"      = interm$type,
+                       "start"     = interm$loc_start,
+                       "end"       = interm$loc_end,
+                       "score"     = ".",
+                       "strand"    = ifelse(interm$direction=="leading", "+","-"),
+                       "phase"     = "0",
+                       "attributes"= attributes)
+    gtfdf<-data.frame("seqid"     = interm$scaffold,
+                      "source"    ="Genbank via gbParse.R",
+                      "type"      = interm$type,
+                      "start"     = interm$loc_start,
+                      "end"       = interm$loc_end,
+                      "score"     = ".",
+                      "strand"    = ifelse(interm$direction=="leading", "+","-"),
+                      "frame"     = "0",
+                      "attributes"= attributesGTF)
+    #    mainHeaderA<-"##gff-version 3"
+    scafHeaderA<-paste("##sequence-region",gff3df[1,"seqid"], 1,gff3df[1,"end"], sep=" ")
+    gff3df<-gff3df[!(gff3df$type %in% exclude),] 
+    gtfdf<-gtfdf[!(gtfdf$type %in% exclude),] 
+    cat(scafHeaderA,append = T,sep="\n",
+        file =  paste(working_dir, input_name, ".gff", sep=""))
+    write.table(x = gff3df, 
+                append = T,
+                col.names = F,row.names = F,
+                file = paste(working_dir, input_name, ".gff", sep=""), 
+                sep="\t", quote = F)
+    write.table(x = gtfdf, 
+                append = T,
+                col.names = F,row.names = F,
+                file = paste(working_dir, input_name, ".gtf", sep=""), 
+                sep="\t", quote = F)
+    
   }
 } else{
   finalDF<-resultsEachScaf[[1]]
+  attributes<-paste(
+    "ID=",finalDF$type,":",finalDF$locus_tag,
+    ";Name=", finalDF$gene, 
+    ";Alias=", finalDF$old_locus_tag, 
+    # ";Parent=",
+    # ";Target=",
+    # ";Gap=",
+    # ";Derives_from=",
+    # ";Note=",
+    ";Dbxref=", finalDF$db_xref,
+    # ";Ontology_term=", 
+    # ";Is_circular=",
+    sep='')
+  attributesGTF<-paste(
+    'gene_id "',finalDF$locus_tag,'";',
+    'transcript_id "', finalDF$locus_tag, '";',
+    sep='')
+  gff3df<-data.frame("seqid"     = finalDF$scaffold,
+                     "source"    ="Genbank via gbParse.R",
+                     "type"      = finalDF$type,
+                     "start"     = finalDF$loc_start,
+                     "end"       = finalDF$loc_end,
+                     "score"     = ".",
+                     "strand"    = ifelse(finalDF$direction=="leading", "+","-"),
+                     "phase"     = "0",
+                     "attributes"= attributes)
+  gtfdf<-data.frame("seqid"     = finalDF$scaffold,
+                    "source"    ="Genbank via gbParse.R",
+                    "type"      = finalDF$type,
+                    "start"     = finalDF$loc_start,
+                    "end"       = finalDF$loc_end,
+                    "score"     = ".",
+                    "strand"    = ifelse(finalDF$direction=="leading", "+","-"),
+                    "frame"     = "0",
+                    "attributes"= attributesGTF)
+  mainHeaderA<-"##gff-version 3"
+  scafHeaderA<-paste("##sequence-region",gff3df[1,"seqid"], 1,gff3df[1,"end"], sep=" ")
+  gff3df<-gff3df[!(gff3df$type %in% exclude),]
+  gtfdf<-gtfdf[!(gtfdf$type %in% exclude),] 
+  print(paste("writing gff file:", paste(working_dir, input_name, ".gff", sep="")))
+  
+  writeLines(text=paste(c(mainHeaderA,scafHeaderA),sep = "\n"),
+             con =  paste(working_dir, input_name, ".gff", sep=""))
+  write.table(x = gff3df, 
+              append = T,
+              col.names = F,row.names = F,
+              file = paste(working_dir, input_name, ".gff", sep=""), 
+              sep="\t", quote = F)
+  write.table(x = gtfdf, 
+              append = F,
+              col.names = F,row.names = F,
+              file = paste(working_dir, input_name, ".gtf", sep=""), 
+              sep="\t", quote = F)
+  
+  
 }
 #  And they all lived happily ever after
 for (fn in scafList){
+  print(paste("removing temp file", fn))
 if (file.exists(fn)) {file.remove(fn)}}
-input_name<-gsub("(.*)(\\.gb)","\\1", gsub("(.*)(\\/)(.*\\.gb)", "\\3", source.file))
+print(paste("writing csv file:",paste(working_dir, input_name, ".csv", sep="")))
+
 write.csv(finalDF, paste(working_dir, input_name, ".csv", sep=""))
 
-####  make a GFF3 file
-attributes<-paste(
-  "ID=",finalDF$locus_tag,
-  ";Name=", finalDF$gene, 
-  ";Alias=", finalDF$old_locus_tag, 
-  ";Parent=",
-  ";Target=", 
-  ";Gap=", 
-  ";Derives_from=", 
-  ";Note=", 
-  ";Dbxref=", finalDF$db_xref,
-  ";Ontology_term=", 
-  ";Is_circular=",
-  sep='')
-gtt3df<-data.frame("seqid"     = finalDF$scaffold,
-                   "source"    ="Genbank via gbParse.R",
-                   "type"      = finalDF$type,
-                   "start"     = finalDF$loc_start,
-                   "end"       = finalDF$loc_end,
-                   "score"     = ".",
-                   "strand"    = ifelse(finalDF$direction=="leading", "+","-"),
-                   "phase"     = "0",
-                   "attributes"= attributes)
-exclude<-c("misc_feature","misc_binding","assembly_gap","source")  
-gtt3df<-gtt3df[!(gtt3df$type %in% exclude),]                
 
-write.table(x = gtt3df, 
-            file = paste(working_dir, input_name, ".gff", sep=""), 
-            sep="\t")
 
-# writeLines(fastaString,
-#            con = paste(working_dir, input_name, ".fasta", sep=""))
 
+# 
+# 
+# 
+# attributes<-paste(
+#   "ID=",finalDF$locus_tag,
+#   ";Name=", finalDF$gene, 
+#   ";Alias=", finalDF$old_locus_tag, 
+#   ";Parent=",
+#   ";Target=", 
+#   ";Gap=", 
+#   ";Derives_from=", 
+#   ";Note=", 
+#   ";Dbxref=", finalDF$db_xref,
+#   ";Ontology_term=", 
+#   ";Is_circular=",
+#   sep='')
+# gff3df<-data.frame("seqid"     = finalDF$scaffold,
+#                    "source"    ="Genbank via gbParse.R",
+#                    "type"      = finalDF$type,
+#                    "start"     = finalDF$loc_start,
+#                    "end"       = finalDF$loc_end,
+#                    "score"     = ".",
+#                    "strand"    = ifelse(finalDF$direction=="leading", "+","-"),
+#                    "phase"     = "0",
+#                    "attributes"= attributes)
+# exclude<-c("misc_feature","misc_binding","assembly_gap","source")  
+# gff3df<-gff3df[!(gff3df$type %in% exclude),] 
+# sequence-region AWXG01000001.1 1 7547 finalDF[1,loc_end]
+# for (i in 1:nrow(gff3df)-1){
+#   if (gff3df[i, "seqid"]!=gff3df[i+1, "seqid"]){
+#     gff3df <- rbind(gff3df[1:i,],c(paste("##", gff3df[i, "seqid"], " 1", )),gff3df[-(1:r),])
+#     
+#   }
+# }
+# 
+# writeLines(text =paste(c("##gff-version 3",
+#                          paste("##sequence-region 1 1497228",sep = "\n",
+#            con =  paste(working_dir, input_name, ".gff", sep=""))
+# write.table(x = gff3df, 
+#             append = TRUE,
+#             col.names = F,row.names = F,
+#             file = paste(working_dir, input_name, ".gff", sep=""), 
+#             sep="\t", quote = F)
+# 
+# # writeLines(fastaString,
+# #            con = paste(working_dir, input_name, ".fasta", sep=""))
+print(paste("writing fasta file:",paste(working_dir, input_name, ".fasta", sep="")))
+for (i in 1:length(sequences)){
+  write.fasta(names = unlist(sequences[[i]][1]),sequences = unlist(sequences[[i]][2]) ,
+              nbchar = 20,open = "a",file.out =  paste(working_dir, input_name, ".fasta", sep=""))
+}
+
+##
 
 
