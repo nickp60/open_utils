@@ -529,14 +529,49 @@ sequences<-  lapply(scafList, function(i){
   out<-list(i, seqs)
   return(out)
 })
-for( i in sequences)
-fastaString<-paste(fastaString, 
-                   paste(">", i, sep=''),
-                   paste(strwrap(seqs,80), collapse="\n"),
-                   collapse="\n")
 
-
+##################  from seqinR
+write.fasta<-function (sequences, names, file.out, open = "w", nbchar = 60, 
+            as.string = FALSE) 
+  {
+    outfile <- file(description = file.out, open = open)
+    write.oneseq <- function(sequence, name, nbchar, as.string) {
+      writeLines(paste(">", name, sep = ""), outfile)
+      if (as.string) 
+        sequence <- s2c(sequence)
+      l <- length(sequence)
+      q <- floor(l/nbchar)
+      r <- l - nbchar * q
+      if (q > 0) {
+        sapply(seq_len(q), function(x) writeLines(c2s(sequence[(nbchar * 
+                                                                  (x - 1) + 1):(nbchar * x)]), outfile))
+      }
+      if (r > 0) {
+        writeLines(c2s(sequence[(nbchar * q + 1):l]), outfile)
+      }
+    }
+    if (!is.list(sequences)) {
+      write.oneseq(sequence = sequences, name = names, nbchar = nbchar, 
+                   as.string = as.string)
+    }
+    else {
+      n.seq <- length(sequences)
+      sapply(seq_len(n.seq), function(x) write.oneseq(sequence = as.character(sequences[[x]]), 
+                                                      name = names[x], nbchar = nbchar, as.string = as.string))
+    }
+    close(outfile)
+}
+##################
+fastanames<-for (i in sequences){
+  return(i[1])
+}
+fastaseqs<-for (i in sequences){
+  return(i[2])
+}
+write.fasta(names = fastanames,sequences =fastaseqs ,
+            file.out =  paste(working_dir, input_name, ".fasta", sep=""))
 ##
+
 if(length(resultsEachScaf)>1){
   finalDF<-
     resultsEachScaf[[1]]
@@ -583,6 +618,8 @@ write.table(x = gtt3df,
             file = paste(working_dir, input_name, ".gff", sep=""), 
             sep="\t")
 
+# writeLines(fastaString,
+#            con = paste(working_dir, input_name, ".fasta", sep=""))
 
 
 
