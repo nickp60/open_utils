@@ -6,15 +6,18 @@
 #
 #                         by Nick Waters
 #                           20160126
-#                         Version 0.3.7
+#                         Version 0.3.8
 ################################################################################
 ################################################################################
 
 #   Usage: $ Rscript gbparseR.R input.gb  output_path *upstream_ and_downstream_bps
 #                                                     *optional
 
-# Minor update 0.3.7: 
-# fixed output as gff to have a header for each scaffold
+# Minor update 0.3.8: 
+# made gtf output availible
+
+#  known bugs:  need to make support for joined CDS's , ie:
+# "complement(join(332323..2323,223234.2342325.))
 
 
 # Cant have upstream region definitions and no output path.  you will break it. :(
@@ -485,6 +488,41 @@ get_seqs<-function(gbdf, seq, upstream=500, downstream=500){
 }
 #^^^^^^^^^ 
 #result<-get_seqs(gbdf = ranges, seq = returns[[3]], upstream = 500, downstream = 500)
+##################  from seqinR
+c2s<-function (chars = c("m", "e", "r", "g", "e", "d")) {
+  return(paste(chars, collapse = ""))
+}
+
+write.fasta<-function (sequences, names, file.out, open = "w", nbchar = 60, 
+                       as.string = FALSE) {
+  outfile <- file(description = file.out, open = open)
+  write.oneseq <- function(sequence, name, nbchar, as.string) {
+    writeLines(paste(">", name, sep = ""), outfile)
+    if (as.string) 
+      sequence <- s2c(sequence)
+    l <- length(sequence)
+    q <- floor(l/nbchar)
+    r <- l - nbchar * q
+    if (q > 0) {
+      sapply(seq_len(q), function(x) writeLines(c2s(sequence[(nbchar * 
+                                                                (x - 1) + 1):(nbchar * x)]), outfile))
+    }
+    if (r > 0) {
+      writeLines(c2s(sequence[(nbchar * q + 1):l]), outfile)
+    }
+  }
+  if (!is.list(sequences)) {
+    write.oneseq(sequence = sequences, name = names, nbchar = nbchar, 
+                 as.string = as.string)
+  }
+  else {
+    n.seq <- length(sequences)
+    sapply(seq_len(n.seq), function(x) write.oneseq(sequence = as.character(sequences[[x]]), 
+                                                    name = names[x], nbchar = nbchar, as.string = as.string))
+  }
+  close(outfile)
+}
+##################
 
 ################################################################################
 #  Alrighty now, time to make this work for multiple sscaffolds. Test with a single
@@ -530,41 +568,6 @@ sequences<-  lapply(scafList, function(i){
   return(out)
 })
 
-##################  from seqinR
-c2s<-function (chars = c("m", "e", "r", "g", "e", "d")) {
-  return(paste(chars, collapse = ""))
-}
-
-write.fasta<-function (sequences, names, file.out, open = "w", nbchar = 60, 
-            as.string = FALSE) {
-    outfile <- file(description = file.out, open = open)
-    write.oneseq <- function(sequence, name, nbchar, as.string) {
-      writeLines(paste(">", name, sep = ""), outfile)
-      if (as.string) 
-        sequence <- s2c(sequence)
-      l <- length(sequence)
-      q <- floor(l/nbchar)
-      r <- l - nbchar * q
-      if (q > 0) {
-        sapply(seq_len(q), function(x) writeLines(c2s(sequence[(nbchar * 
-                                                                  (x - 1) + 1):(nbchar * x)]), outfile))
-      }
-      if (r > 0) {
-        writeLines(c2s(sequence[(nbchar * q + 1):l]), outfile)
-      }
-    }
-    if (!is.list(sequences)) {
-      write.oneseq(sequence = sequences, name = names, nbchar = nbchar, 
-                   as.string = as.string)
-    }
-    else {
-      n.seq <- length(sequences)
-      sapply(seq_len(n.seq), function(x) write.oneseq(sequence = as.character(sequences[[x]]), 
-                                                      name = names[x], nbchar = nbchar, as.string = as.string))
-    }
-    close(outfile)
-}
-##################
 # fastanames<-list()
 # fastaseqs <-list()
 # for (i in 1:length(sequences)){
@@ -634,6 +637,27 @@ if(length(resultsEachScaf)>1){
   scafHeaderA<-paste("##sequence-region",gff3df[1,"seqid"], 1,gff3df[1,"end"], sep=" ")
   gff3df<-gff3df[!(gff3df$type %in% exclude),] 
   gtfdf<-gtfdf[!(gtfdf$type %in% exclude),] 
+  ####  hack up to add codons
+  gtfdf <-gtfdf [!(gtfdf$type  %in% exclude),] 
+  start_codons<-gtfdf[gtfdf$type=="CDS",]
+  start_codons$type<-"start_codon"
+  start_codons$end<-start_codons$start+2
+  stop_codons<-gtfdf[gtfdf$type=="CDS",]
+  stop_codons$type<-"stop_codon"
+  stop_codons$start<-stop_codons$end-2
+  exons<-gtfdf[gtfdf$type=="CDS",]
+  exons$type<-"exon"
+  new_cds<-gtfdf[gtfdf$type=="CDS",]
+  new_cds$end <-  new_cds$end-2
+  #  rip and stitch
+  gtfdf<-gtfdf[gtfdf$type!="CDS",]
+  gtfdf<-rbind(gtfdf,start_codons)
+  gtfdf<-rbind(gtfdf,stop_codons)
+  gtfdf<-rbind(gtfdf,exons)
+  gtfdf<-rbind(gtfdf,new_cds)
+  gtfdf<-gtfdf[order(gtfdf$start),]
+  
+  ######
   print(paste("writing gff file:", paste(working_dir, input_name, ".gff", sep="")))
   
   writeLines(text=paste(c(mainHeaderA,scafHeaderA),sep = "\n"),
@@ -691,6 +715,27 @@ if(length(resultsEachScaf)>1){
     scafHeaderA<-paste("##sequence-region",gff3df[1,"seqid"], 1,gff3df[1,"end"], sep=" ")
     gff3df<-gff3df[!(gff3df$type %in% exclude),] 
     gtfdf<-gtfdf[!(gtfdf$type %in% exclude),] 
+    ####  hack up to add codons
+    gtfdf <-gtfdf [!(gtfdf$type  %in% exclude),] 
+    start_codons<-gtfdf[gtfdf$type=="CDS",]
+    start_codons$type<-"start_codon"
+    start_codons$end<-start_codons$start+2
+    stop_codons<-gtfdf[gtfdf$type=="CDS",]
+    stop_codons$type<-"stop_codon"
+    stop_codons$start<-stop_codons$end-2
+    exons<-gtfdf[gtfdf$type=="CDS",]
+    exons$type<-"exon"
+    new_cds<-gtfdf[gtfdf$type=="CDS",]
+    new_cds$end <-  new_cds$end-2
+    #  rip and stitch
+    gtfdf<-gtfdf[gtfdf$type!="CDS",]
+    gtfdf<-rbind(gtfdf,start_codons)
+    gtfdf<-rbind(gtfdf,stop_codons)
+    gtfdf<-rbind(gtfdf,exons)
+    gtfdf<-rbind(gtfdf,new_cds)
+    gtfdf<-gtfdf[order(gtfdf$start),]
+    
+    ######
     cat(scafHeaderA,append = T,sep="\n",
         file =  paste(working_dir, input_name, ".gff", sep=""))
     write.table(x = gff3df, 
@@ -741,11 +786,31 @@ if(length(resultsEachScaf)>1){
                     "score"     = ".",
                     "strand"    = ifelse(finalDF$direction=="leading", "+","-"),
                     "frame"     = "0",
-                    "attributes"= attributesGTF)
+                    "attributes"= attributesGTF, stringsAsFactors = F)
   mainHeaderA<-"##gff-version 3"
   scafHeaderA<-paste("##sequence-region",gff3df[1,"seqid"], 1,gff3df[1,"end"], sep=" ")
   gff3df<-gff3df[!(gff3df$type %in% exclude),]
-  gtfdf<-gtfdf[!(gtfdf$type %in% exclude),] 
+####  hack up to add codons
+  gtfdf <-gtfdf [!(gtfdf$type  %in% exclude),] 
+  start_codons<-gtfdf[gtfdf$type=="CDS",]
+  start_codons$type<-"start_codon"
+  start_codons$end<-start_codons$start+2
+  stop_codons<-gtfdf[gtfdf$type=="CDS",]
+  stop_codons$type<-"stop_codon"
+  stop_codons$start<-stop_codons$end-2
+  exons<-gtfdf[gtfdf$type=="CDS",]
+  exons$type<-"exon"
+  new_cds<-gtfdf[gtfdf$type=="CDS",]
+  new_cds$end <-  new_cds$end-2
+  #  rip and stitch
+  gtfdf<-gtfdf[gtfdf$type!="CDS",]
+  gtfdf<-rbind(gtfdf,start_codons)
+  gtfdf<-rbind(gtfdf,stop_codons)
+  gtfdf<-rbind(gtfdf,exons)
+  gtfdf<-rbind(gtfdf,new_cds)
+  gtfdf<-gtfdf[order(gtfdf$start),]
+  
+######
   print(paste("writing gff file:", paste(working_dir, input_name, ".gff", sep="")))
   
   writeLines(text=paste(c(mainHeaderA,scafHeaderA),sep = "\n"),
