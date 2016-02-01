@@ -1,20 +1,20 @@
 #!/usr/bin/Rscript
-
+DEBUG<-F
 ################################################################################
 ################################################################################
 #                           gbparseR
 #
 #                         by Nick Waters
 #                           20160126
-#                         Version 0.3.8
+#                         Version 0.3.9
 ################################################################################
 ################################################################################
 
 #   Usage: $ Rscript gbparseR.R input.gb  output_path *upstream_ and_downstream_bps
 #                                                     *optional
 
-# Minor update 0.3.8: 
-# made gtf output availible
+# Minor update 0.3.9: 
+# made fasta outpput not suck as much
 
 #  known bugs:  need to make support for joined CDS's , ie:
 # "complement(join(332323..2323,223234.2342325.))
@@ -39,44 +39,44 @@
 #source.file = "~/GitHub/BlastDBs/uams1.gb"
 #source.file ="~/GitHub/BlastDBs/FPR3757_LAC.gb"
 #source.file ="~/GitHub/BlastDBs/TCH1516.gb"
-#source.file ="~/GitHub/BlastDBs/subtilis168.gb"
-working_dir<-"../gbparse_output/"
-#
-
-
-#
-args<-commandArgs(TRUE)
-
-source.file<-args[1]
-if (is.na(args[2])){
-  cur_dir<-getwd()
-  working_dir<-paste(cur_dir,"/", gsub("-","",Sys.Date()),"gbparseR","/", sep="")
-  if (!dir.exists(working_dir)){dir.create(working_dir)}
-  setwd(working_dir)
-} else if (is.numeric(args[2])){
-  stop("cannot give region width without an output directory")
-} else {
-    output_path<-args[2]
-    if (!dir.exists(output_path)){dir.create(output_path)}
-      setwd(output_path)
-      working_dir<-output_path
-}
-
-if (is.na(args[3]) | is.na(as.numeric(args[3]))){
-  print( "using 500bp as region width")
-  upstream<-500
+if(DEBUG){
+  source.file ="~/GitHub/BlastDBs/subtilis168.gb"
+  working_dir<-"../gbparse_output/"
+  downstream<-upstream<-500
 } else{
-  upstream<-as.numeric(args[3])
-}
-downstream<-upstream #same upstream as downstream.  need more flexibility? figure it out..
-
-#  sanity check:
-print(paste("genome source file: ", source.file))
-print(paste("output directory: ", working_dir))
-print(paste("upsteam and downstream region width: ", upstream))
+  
+  args<-commandArgs(TRUE)
+  
+  source.file<-args[1]
+  if (is.na(args[2])){
+    cur_dir<-getwd()
+    working_dir<-paste(cur_dir,"/", gsub("-","",Sys.Date()),"gbparseR","/", sep="")
+    if (!dir.exists(working_dir)){dir.create(working_dir)}
+    setwd(working_dir)
+  } else if (is.numeric(args[2])){
+    stop("cannot give region width without an output directory")
+  } else {
+      output_path<-args[2]
+      if (!dir.exists(output_path)){dir.create(output_path)}
+        setwd(output_path)
+        working_dir<-output_path
+  }
+  
+  if (is.na(args[3]) | is.na(as.numeric(args[3]))){
+    print( "using 500bp as region width")
+    upstream<-500
+  } else{
+    upstream<-as.numeric(args[3])
+  }
+  downstream<-upstream #same upstream as downstream.  need more flexibility? figure it out..
+  
+  #  sanity check:
+  print(paste("genome source file: ", source.file))
+  print(paste("output directory: ", working_dir))
+  print(paste("upsteam and downstream region width: ", upstream))
 
 #
-
+}
 ################################################################################
 ####  Extract each scaffold and write out to files in a new 
 ####  directory
@@ -488,27 +488,43 @@ get_seqs<-function(gbdf, seq, upstream=500, downstream=500){
 }
 #^^^^^^^^^ 
 #result<-get_seqs(gbdf = ranges, seq = returns[[3]], upstream = 500, downstream = 500)
-##################  from seqinR
+##################  from seqinR, plus my edits
 c2s<-function (chars = c("m", "e", "r", "g", "e", "d")) {
   return(paste(chars, collapse = ""))
 }
+# s2c<-function (string) {
+#   if (is.character(string) && length(string) == 1) {
+#     return(.Call("s2c", string, PACKAGE = "seqinr"))
+#   }
+#   else {
+#     warning("Wrong argument type in s2c(), NA returned")
+#     return(NA)
+#   }
+# }
 
 write.fasta<-function (sequences, names, file.out, open = "w", nbchar = 60, 
                        as.string = FALSE) {
   outfile <- file(description = file.out, open = open)
   write.oneseq <- function(sequence, name, nbchar, as.string) {
     writeLines(paste(">", name, sep = ""), outfile)
-    if (as.string) 
-      sequence <- s2c(sequence)
-    l <- length(sequence)
-    q <- floor(l/nbchar)
-    r <- l - nbchar * q
-    if (q > 0) {
-      sapply(seq_len(q), function(x) writeLines(c2s(sequence[(nbchar * 
-                                                                (x - 1) + 1):(nbchar * x)]), outfile))
+    if (as.string) {
+      #sequence2 <- s2c(sequence)
+      seq<-strsplit(sequence, NULL)[[1]] #instead of s2c
+    } else {
+      seq<-sequence
     }
-    if (r > 0) {
-      writeLines(c2s(sequence[(nbchar * q + 1):l]), outfile)
+    #get dims
+    l <- length(seq) #total chars
+#    l <- nchar(sequence)   #  why length here?
+    q <- floor(l/nbchar) # number of lines needed
+    r <- l - nbchar * q # number of characters on last line
+    if (q > 0) {
+      lapply(1:q, function(x) {
+        writeLines(c2s(seq[(nbchar * (x - 1) + 1):(nbchar * x)]), outfile)
+      })
+    }
+    if (r > 0) {  #  write last line
+      writeLines(c2s(seq[(nbchar * q + 1):l]), outfile)
     }
   }
   if (!is.list(sequences)) {
@@ -517,8 +533,10 @@ write.fasta<-function (sequences, names, file.out, open = "w", nbchar = 60,
   }
   else {
     n.seq <- length(sequences)
-    sapply(seq_len(n.seq), function(x) write.oneseq(sequence = as.character(sequences[[x]]), 
-                                                    name = names[x], nbchar = nbchar, as.string = as.string))
+    lapply(1:n.seq, function(x){
+       write.oneseq(sequence = as.character(sequences[[x]]),
+                    name = names[x], nbchar = nbchar, as.string = as.string)
+    })
   }
   close(outfile)
 }
@@ -557,7 +575,8 @@ resultsEachScaf<-  lapply(scafList, function(i){
   return(result)
   }
 )
-sequences<-  lapply(scafList, function(i){
+#  extract just the sequences for scaffold fasta output
+seqData<-  lapply(scafList, function(i){
   #i=scafList[2]
   #i=source.file
   i=unlist(i)
@@ -567,33 +586,17 @@ sequences<-  lapply(scafList, function(i){
   out<-list(i, seqs)
   return(out)
 })
-
-# fastanames<-list()
-# fastaseqs <-list()
-# for (i in 1:length(sequences)){
-#   fastanames[i]<-sequences[[i]][1]
-#   fastaseqs [i]<-sequences[[i]][2]
-# }
-
+sequences<-list()
+names<-list()
+for (i in 1:length(seqData)){
+  names<-c(names, seqData[[i]][1])
+  sequences<-c(sequences,seqData[[i]][2])
+}
 
 
-# if(length(resultsEachScaf)>1){
-#   finalDF<-
-#     resultsEachScaf[[1]]
-#   for( i in 2:length(resultsEachScaf)){
-#     interm<-resultsEachScaf[[i]]
-#     finalDF<-rbind(finalDF, interm)
-#   }
-# } else{
-#   finalDF<-resultsEachScaf[[1]]
-# }
-# # #  And they all lived happily ever after
-# # for (fn in scafList){
-# # if (file.exists(fn)) {file.remove(fn)}}
-# # input_name<-gsub("(.*)(\\.gb)","\\1", gsub("(.*)(\\/)(.*\\.gb)", "\\3", source.file))
-# # write.csv(finalDF, paste(working_dir, input_name, ".csv", sep=""))
 input_name<-gsub("(.*)(\\.gb)","\\1", gsub("(.*)(\\/)(.*\\.gb)", "\\3", source.file))
-exclude<-c("misc_feature","misc_RNA","misc_binding","assembly_gap","source")  
+#exclude<-c("misc_feature","misc_RNA","misc_binding","assembly_gap","source")  
+exclude<-c("source","noSOFA")  
 
 ####  make a GFF3 file
 if(length(resultsEachScaf)>1){
@@ -615,6 +618,26 @@ if(length(resultsEachScaf)>1){
     'gene_id "',finalDF$locus_tag,'";',
     'transcript_id "', finalDF$locus_tag, '";',
    sep='')
+  #  give SOFA accession numbers for type
+  gff3type<-lapply(finalDF$type, function(x){
+    if (x =="CDS"){
+      return("SO:0000316")
+    } else if (x =="pseudo"){
+      return("SO:0000336")
+    } else if (x =="rRNA"){
+      return("SO:0000252")
+    } else if (x =="tRNA"){
+      return("SO:0000253")
+    } else if (x =="misc_feature"){ #genbank feature
+      return("SO:0000253")
+    } else if (x =="misc_RNA"){ #snoRNA
+      return("SO:0000275")
+    } else if (x =="misc_binding"){  #binding site
+      return("SO:0000409")
+   } else if (x =="assembly_gap"){ #  assembly component
+      return("SO:0000143")
+    }
+  })
   gff3df<-data.frame("seqid"     = finalDF$scaffold,
                      "source"    ="Genbank via gbParse.R",
                      "type"      = finalDF$type,
@@ -695,7 +718,7 @@ if(length(resultsEachScaf)>1){
       sep='')
     gff3df<-data.frame("seqid"     = interm$scaffold,
                        "source"    ="Genbank via gbParse.R",
-                       "type"      = interm$type,
+                       "type"      = unlist(interm),
                        "start"     = interm$loc_start,
                        "end"       = interm$loc_end,
                        "score"     = ".",
@@ -769,9 +792,31 @@ if(length(resultsEachScaf)>1){
     'gene_id "',finalDF$locus_tag,'";',
     'transcript_id "', finalDF$locus_tag, '";',
     sep='')
+  gff3type<-lapply(finalDF$type, function(x){
+    if (x =="CDS"){
+      return("SO:0000316")
+    } else if (x =="pseudo"){
+      return("SO:0000336")
+    } else if (x =="rRNA"){
+      return("SO:0000252")
+    } else if (x =="tRNA"){
+      return("SO:0000253")
+    } else if (x =="misc_feature"){ #genbank feature
+      return("SO:0000253")
+    } else if (x =="misc_RNA"){ #snoRNA
+      return("SO:0000275")
+    } else if (x =="misc_binding"){  #binding site
+      return("SO:0000409")
+    } else if (x =="assembly_gap"){ #  assembly component
+      return("SO:0000143")
+    } else {
+      return("noSOFA")
+    }
+  })
+  
   gff3df<-data.frame("seqid"     = finalDF$scaffold,
                      "source"    ="Genbank via gbParse.R",
-                     "type"      = finalDF$type,
+                     "type"      = unlist(gff3type),
                      "start"     = finalDF$loc_start,
                      "end"       = finalDF$loc_end,
                      "score"     = ".",
@@ -828,6 +873,7 @@ if(length(resultsEachScaf)>1){
   
   
 }
+
 #  And they all lived happily ever after
 for (fn in scafList){
   print(paste("removing temp file", fn))
@@ -837,59 +883,15 @@ print(paste("writing csv file:",paste(working_dir, input_name, ".csv", sep="")))
 write.csv(finalDF, paste(working_dir, input_name, ".csv", sep=""))
 
 
-
-
-# 
-# 
-# 
-# attributes<-paste(
-#   "ID=",finalDF$locus_tag,
-#   ";Name=", finalDF$gene, 
-#   ";Alias=", finalDF$old_locus_tag, 
-#   ";Parent=",
-#   ";Target=", 
-#   ";Gap=", 
-#   ";Derives_from=", 
-#   ";Note=", 
-#   ";Dbxref=", finalDF$db_xref,
-#   ";Ontology_term=", 
-#   ";Is_circular=",
-#   sep='')
-# gff3df<-data.frame("seqid"     = finalDF$scaffold,
-#                    "source"    ="Genbank via gbParse.R",
-#                    "type"      = finalDF$type,
-#                    "start"     = finalDF$loc_start,
-#                    "end"       = finalDF$loc_end,
-#                    "score"     = ".",
-#                    "strand"    = ifelse(finalDF$direction=="leading", "+","-"),
-#                    "phase"     = "0",
-#                    "attributes"= attributes)
-# exclude<-c("misc_feature","misc_binding","assembly_gap","source")  
-# gff3df<-gff3df[!(gff3df$type %in% exclude),] 
-# sequence-region AWXG01000001.1 1 7547 finalDF[1,loc_end]
-# for (i in 1:nrow(gff3df)-1){
-#   if (gff3df[i, "seqid"]!=gff3df[i+1, "seqid"]){
-#     gff3df <- rbind(gff3df[1:i,],c(paste("##", gff3df[i, "seqid"], " 1", )),gff3df[-(1:r),])
-#     
-#   }
-# }
-# 
-# writeLines(text =paste(c("##gff-version 3",
-#                          paste("##sequence-region 1 1497228",sep = "\n",
-#            con =  paste(working_dir, input_name, ".gff", sep=""))
-# write.table(x = gff3df, 
-#             append = TRUE,
-#             col.names = F,row.names = F,
-#             file = paste(working_dir, input_name, ".gff", sep=""), 
-#             sep="\t", quote = F)
 # 
 # # writeLines(fastaString,
 # #            con = paste(working_dir, input_name, ".fasta", sep=""))
 print(paste("writing fasta file:",paste(working_dir, input_name, ".fasta", sep="")))
-for (i in 1:length(sequences)){
-  write.fasta(names = unlist(sequences[[i]][1]),sequences = unlist(sequences[[i]][2]) ,
-              nbchar = 20,open = "a",file.out =  paste(working_dir, input_name, ".fasta", sep=""))
-}
+write.fasta(names = names,
+            sequences =sequences,as.string = T,
+              nbchar = 80,open = "a",
+            file.out =  paste(working_dir, input_name, ".fasta", sep=""))
+
 
 ##
 
