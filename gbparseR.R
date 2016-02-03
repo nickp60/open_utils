@@ -596,7 +596,7 @@ for (i in 1:length(seqData)){
 
 input_name<-gsub("(.*)(\\.gb)","\\1", gsub("(.*)(\\/)(.*\\.gb)", "\\3", source.file))
 #exclude<-c("misc_feature","misc_RNA","misc_binding","assembly_gap","source")  
-exclude<-c("source","noSOFA")  
+exclude<-c("source","noSOFA", "assembly_gap")  
 
 ####  make a GFF3 file
 if(length(resultsEachScaf)>1){
