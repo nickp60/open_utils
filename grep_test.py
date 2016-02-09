@@ -7,7 +7,7 @@ Created on Tue Feb 24 13:39:09 2015
 ##################               Brinsmade Lab                #################
 @author: Nick Waters
 
-#                             Version 4.2
+#                             Version 4.1
 #                               20151217
 #
 #   About:  this script is essentially a wrapper for NCBI BLAST+, the 
@@ -20,7 +20,7 @@ Created on Tue Feb 24 13:39:09 2015
 #   -fixed the hack to recast malformed dataframe (index, record iterations, etc)
 #
 #   Minor version revisions:
-#   -added optional grep arg for pulling out locus tags
+#   -made it work
 #
 # 
 #   Requires: -installation of BioPython and NCBI Blast+ standalone suite
@@ -64,7 +64,7 @@ if DEBUG:
     input_target_fasta = os.path.expanduser("~/GitHub/BlastDBs/CP000253_8325.fasta")
     nuc_flag=True
     remake_blast_db=True
-    pattern='(.*gene=)(.*?)](.*)'
+    pattern="gene=(.*?)]"
 else:
     parser = argparse.ArgumentParser(description='Reciprocal blast for crude genome reannotation. \
     Requires a .gb file as the query and a protein fasta as the target for reannotation')
@@ -72,7 +72,7 @@ else:
     parser.add_argument("target_db", help="target amino acid fasta file to compare your query genome to")
     parser.add_argument("-n","--nucleotide", help="T if you need a nucleotide fasta returned", type=bool)
     parser.add_argument("-r","--remake", help="T if you need a nucleotide fasta returned", type=bool)
-    parser.add_argument("-g","--grep_pattern", default='(.*gene=)(.*?)](.*)', help="grep pattern for isolating the locus_tag in the target fasta", type=str)
+    parser.add_argument("-g","--grep_pattern", default='', help="grep pattern for isolating the locus_tag in the target fasta", type=str)
     args = parser.parse_args()    
     input_genome = args.query_db
     input_target_fasta = args.target_db
@@ -274,10 +274,11 @@ targetdf = xml_to_df(record_recip)
 #%%
 
 d2 = pd.DataFrame(targetdf.match_in_target.str.split("|").tolist(), columns=genbankdf.columns[2:6],index=np.arange(len(targetdf))+1 )
+
 #%%targetdf.match_in_target=d2.locus_tag
-targetdf=targetdf.sort_values(by="match_in_target")
+targetdf=targetdf.sort(columns="match_in_target")
 targetdf.reset_index(level=0, inplace=True)
-querydf=querydf.sort_values(by="locus_tag")
+querydf=querydf.sort(columns="locus_tag")
 
 #%%
 #TODO: use bit score and gaps to create homologue filtering schema
@@ -328,14 +329,11 @@ for i in querydf.locus_tag: #for each locus tag in query,
 
 new=pd.merge(genbankdf, querydf, on='locus_tag')#, suffixes=['_left', '_right'])
 #%% separate match_in_target with grep
-
-#TODO can this be sped up?
 if len(pattern)>0:
-    genelist=list()
-    for line in new.match_in_target:
-        target_locus_tag=re.sub(pattern,r"\2", str(line))
-        genelist.append(target_locus_tag)
-    new['target_locus_tag']=genelist
+    locusdf=pd.DataFrame(columns=("target_locus_tag"))
+    for line in new:
+		counter=0
+        print(re.sub(pattern, line)
 
 #%% Write new database to output path
 print("Writing results as CSV")
