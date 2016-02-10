@@ -60,7 +60,7 @@ DEBUG=False
 remake_blast_db=False
 nuc_flag=True
 if DEBUG:
-    input_genome = os.path.expanduser("~/GitHub/BlastDBs/subtilis168.gb")
+    input_genome = os.path.expanduser("~/GitHub/BlastDBs/uams1.gb")
     input_target_fasta = os.path.expanduser("~/GitHub/BlastDBs/CP000253_8325.fasta")
     nuc_flag=True
     remake_blast_db=True
@@ -137,7 +137,7 @@ for record in SeqIO.parse(input_handle, "genbank"):
         except KeyError:
             genbankdf.loc[index, "type"] = "pseudo" 
 genbankdf.reset_index(level=0, inplace=True)
-#%% set up recipient structures
+# set up recipient structures
 #print(genbankdf.loc[genbankdf['locus_tag'] == 'QV15_00005'])   ### just a test      
 
 
@@ -184,7 +184,7 @@ def prepare_for_blastaa(x):
 prepare_for_blastaa(genbankdf)
 SeqIO.write(aaseqList, aaoutput_handle, "fasta")
 
- #%%  close open handles
+#  close open handles
 input_handle.close()
 aaoutput_handle.close()
 #%%  Make a database from Fasta file using subprocess to pipe to shell

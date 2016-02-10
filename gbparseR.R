@@ -463,7 +463,8 @@ extract_features<-function(data, ranges, locus_tag="locus_tag", debug=F){ #y=gre
 # this function extracts the nucleotide sequence from the .gb file, along with 
 #upstream and downstream regions of interest
 get_seqs<-function(gbdf, seq, upstream=500, downstream=500){
-  for( i in gbdf[gbdf$type !="source","id"]){ #print(i)}
+  idlist<-gbdf[gbdf$type !="source","id"]
+  for( i in idlist){ #print(i)}
     #gbdf["id"==i, "seq"]<- 
     gbdf[gbdf$id==i,"dnaseq"]<-
       substr(seq, gbdf[gbdf$id==i, "loc_start"], gbdf[gbdf$id==i, "loc_end"])
@@ -473,6 +474,16 @@ get_seqs<-function(gbdf, seq, upstream=500, downstream=500){
     gbdf[gbdf$id==i,"dnaseq_downstream"]<-
       substr(seq, gbdf[gbdf$id==i, "loc_end"], 
              gbdf[gbdf$id==i, "loc_end"]+downstream)
+    if (i==idlist[length(idlist)]){
+      next
+    } else{
+     # print(paste("id:",i))
+      # 15 is the approx limit to the RBS
+    gbdf[gbdf$id==i,"preceeding_intergenic_region"]<-
+      ifelse(gbdf[gbdf$id==i, "direction"]=="leading",
+        substr(seq, gbdf[gbdf$id==i-1, "loc_end"]+15,gbdf[gbdf$id==i, "loc_start"]-15),
+        substr(seq, gbdf[gbdf$id==i, "loc_end"]+15,gbdf[gbdf$id==i+1, "loc_start"]-15))
+    }
     #gbdf["id"==i, "upstrea"]
   }
   gbdf$region<-paste(gbdf$dnaseq_upstream, toupper(gbdf$dnaseq), gbdf$dnaseq_downstream, sep="")
@@ -484,6 +495,7 @@ get_seqs<-function(gbdf, seq, upstream=500, downstream=500){
     ifelse(gbdf$direction=="leading",
            paste(substr(gbdf$dnaseq_upstream,   1, (nchar(gbdf$dnaseq_upstream)-15)), sep=""),
            paste(substr(gbdf$dnaseq_downstream, 15, nchar(gbdf$dnaseq_downstream)), sep=""))
+
   gbdf
 }
 #^^^^^^^^^ 
