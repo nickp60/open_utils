@@ -102,7 +102,8 @@ split_if_scaffolded<-function(source.file){
                gsub("VERSION (.*) (.*)","\\1", grep("VERSION", input, value = T)))
     print(paste("saving formatted scaffold:",paste(scaf, "_scaf_1.txt", sep="")))
     write(input, paste(scaf, "_scaf_1.txt", sep=""))
-    }
+  }
+  gc()
 }
 #^^^^^^^^^  
 #split_if_scaffolded(source.file)
