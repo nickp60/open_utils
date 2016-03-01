@@ -5,16 +5,17 @@ DEBUG<-F
 #                           gbparseR
 #
 #                         by Nick Waters
-#                           20160126
-#                         Version 0.3.9
+#                           20160229
+#                         Version 0.3.91
 ################################################################################
 ################################################################################
 
 #   Usage: $ Rscript gbparseR.R input.gb  output_path *upstream_ and_downstream_bps
 #                                                     *optional
 
-# Minor update 0.3.9: 
-# made fasta outpput not suck as much
+# Minor update 0.3.91: 
+# -fixed args to make usage warnings
+# -removed broken gff3 output.  THIS IS THE BIGGEST TODO
 
 #  known bugs:  need to make support for joined CDS's , ie:
 # "complement(join(332323..2323,223234.2342325.))
@@ -40,43 +41,39 @@ DEBUG<-F
 #source.file ="~/GitHub/BlastDBs/FPR3757_LAC.gb"
 #source.file ="~/GitHub/BlastDBs/TCH1516.gb"
 if(DEBUG){
-  source.file ="~/GitHub/BlastDBs/subtilis168.gb"
-  working_dir<-"../gbparse_output/"
-  downstream<-upstream<-500
+  args<-c("~/GitHub/BlastDBs/CP000253_8325.gb","../gbparse_output/", "500")
 } else{
-  
   args<-commandArgs(TRUE)
-  
-  source.file<-args[1]
-  if (is.na(args[2])){
-    cur_dir<-getwd()
-    working_dir<-paste(cur_dir,"/", gsub("-","",Sys.Date()),"gbparseR","/", sep="")
-    if (!dir.exists(working_dir)){dir.create(working_dir)}
-    setwd(working_dir)
-  } else if (is.numeric(args[2])){
-    stop("cannot give region width without an output directory")
-  } else {
-      output_path<-args[2]
-      if (!dir.exists(output_path)){dir.create(output_path)}
-        setwd(output_path)
-        working_dir<-output_path
-  }
-  
-  if (is.na(args[3]) | is.na(as.numeric(args[3]))){
-    print( "using 500bp as region width")
-    upstream<-500
-  } else{
-    upstream<-as.numeric(args[3])
-  }
-  downstream<-upstream #same upstream as downstream.  need more flexibility? figure it out..
-  
-  #  sanity check:
-  print(paste("genome source file: ", source.file))
-  print(paste("output directory: ", working_dir))
-  print(paste("upsteam and downstream region width: ", upstream))
-
-#
 }
+if (is.na(args[1]) | !file.exists(args[1])){  #if input is blank or the file doesnt exist,
+  stop("Error: needs an input file!")
+}
+source.file<-args[1]
+if (is.na(args[2])){
+  print("using current working directory and default region size of 500")
+  cur_dir<-getwd()
+  working_dir<-paste(cur_dir,"/", gsub("-","",Sys.Date()),"gbparseR","/", sep="")
+  if (!dir.exists(working_dir)){dir.create(working_dir)}
+  setwd(working_dir)
+} else if (is.numeric(args[2])){
+    stop("cannot give region width without an output directory")
+} else {
+    output_path<-args[2]
+    if (!dir.exists(output_path)){dir.create(output_path)}
+      setwd(output_path)
+      working_dir<-output_path
+}
+if (is.na(args[3]) | is.na(as.numeric(args[3])) | 0>(as.numeric(args[3]))){
+  print( "no region or non-numeric region; using 500bp as region width")
+  upstream<-downstream<-500
+} else{
+  upstream<-as.numeric(args[3])
+}
+#downstream<-upstream #same upstream as downstream.  need more flexibility? figure it out..
+#  sanity check:
+print(paste("genome source file: ", source.file))
+print(paste("output directory: ", working_dir))
+print(paste("upsteam and downstream region width: ", upstream))
 ################################################################################
 ####  Extract each scaffold and write out to files in a new 
 ####  directory
@@ -698,11 +695,11 @@ if(length(resultsEachScaf)>1){
   
   writeLines(text=paste(c(mainHeaderA,scafHeaderA),sep = "\n"),
              con =  paste(working_dir, input_name, ".gff", sep=""))
-  write.table(x = gff3df, 
-              append = T,
-              col.names = F,row.names = F,
-              file = paste(working_dir, input_name, ".gff", sep=""), 
-              sep="\t", quote = F)
+  # write.table(x = gff3df, 
+  #             append = T,
+  #             col.names = F,row.names = F,
+  #             file = paste(working_dir, input_name, ".gff", sep=""), 
+  #             sep="\t", quote = F)
   write.table(x = gtfdf, 
               append = F,
               col.names = F,row.names = F,
@@ -774,11 +771,11 @@ if(length(resultsEachScaf)>1){
     ######
     cat(scafHeaderA,append = T,sep="\n",
         file =  paste(working_dir, input_name, ".gff", sep=""))
-    write.table(x = gff3df, 
-                append = T,
-                col.names = F,row.names = F,
-                file = paste(working_dir, input_name, ".gff", sep=""), 
-                sep="\t", quote = F)
+    # write.table(x = gff3df, 
+    #             append = T,
+    #             col.names = F,row.names = F,
+    #             file = paste(working_dir, input_name, ".gff", sep=""), 
+    #             sep="\t", quote = F)
     write.table(x = gtfdf, 
                 append = T,
                 col.names = F,row.names = F,
@@ -873,11 +870,11 @@ if(length(resultsEachScaf)>1){
   
   writeLines(text=paste(c(mainHeaderA,scafHeaderA),sep = "\n"),
              con =  paste(working_dir, input_name, ".gff", sep=""))
-  write.table(x = gff3df, 
-              append = T,
-              col.names = F,row.names = F,
-              file = paste(working_dir, input_name, ".gff", sep=""), 
-              sep="\t", quote = F)
+  # write.table(x = gff3df, 
+  #             append = T,
+  #             col.names = F,row.names = F,
+  #             file = paste(working_dir, input_name, ".gff", sep=""), 
+  #             sep="\t", quote = F)
   write.table(x = gtfdf, 
               append = F,
               col.names = F,row.names = F,
