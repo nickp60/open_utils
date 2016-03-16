@@ -5,20 +5,20 @@ DEBUG<-F
 #                           gbparseR
 #
 #                         by Nick Waters
-#                           20160229
-#                         Version 0.3.91
+#                           20160325
+#                         Version 0.3.93
 ################################################################################
 ################################################################################
 
 #   Usage: $ Rscript gbparseR.R input.gb  output_path *upstream_ and_downstream_bps
 #                                                     *optional
 
-# Minor update 0.3.91: 
-# -fixed args to make usage warnings
-# -removed broken gff3 output.  THIS IS THE BIGGEST TODO
+# Minor update 0.3.93 
+#fixed NA's in strand
 
 #  known bugs:  need to make support for joined CDS's , ie:
 # "complement(join(332323..2323,223234.2342325.))
+#  -broken gff3 output.  THIS IS THE BIGGEST TODO
 
 
 # Cant have upstream region definitions and no output path.  you will break it. :(
@@ -41,7 +41,7 @@ DEBUG<-F
 #source.file ="~/GitHub/BlastDBs/FPR3757_LAC.gb"
 #source.file ="~/GitHub/BlastDBs/TCH1516.gb"
 if(DEBUG){
-  args<-c("~/GitHub/BlastDBs/CP000253_8325.gb","../gbparse_output/", "500")
+  args<-c("~/uams1_rs.gb","../gbparse_output/", "500")
 } else{
   args<-commandArgs(TRUE)
 }
@@ -67,7 +67,7 @@ if (is.na(args[3]) | is.na(as.numeric(args[3])) | 0>(as.numeric(args[3]))){
   print( "no region or non-numeric region; using 500bp as region width")
   upstream<-downstream<-500
 } else{
-  upstream<-as.numeric(args[3])
+  downstream<-upstream<-as.numeric(args[3])
 }
 #downstream<-upstream #same upstream as downstream.  need more flexibility? figure it out..
 #  sanity check:
@@ -581,10 +581,22 @@ resultsEachScaf<-  lapply(scafList, function(i){
   ranges<-clean_ranges_rna(ranges, returns[[2]])
   ranges<-extract_features(data=returns[[2]],ranges =  ranges,locus_tag = "locus_tag")
   result<-get_seqs(gbdf = ranges, seq = returns[[3]], upstream = upstream, downstream = downstream)
-  result$scaffold<-i
+  result$scaffold<-gsub("(.*)(_scaf.*)","\\1", i)
   return(result)
   }
 )
+all_cols<-unique(unlist(lapply(resultsEachScaf, colnames))) #get all column names used
+resultsEachScaf<-lapply(1:length(resultsEachScaf), function(x){
+  if (length(all_cols[(!all_cols %in% colnames(resultsEachScaf[[x]]))])>0){
+    new_cols<-all_cols[(!all_cols %in% colnames(resultsEachScaf[[x]]))]
+    for(i in new_cols){
+      resultsEachScaf[[x]][,i]<-NA
+    }
+  }
+  return(resultsEachScaf[[x]])
+})
+
+
 #  extract just the sequences for scaffold fasta output
 seqData<-  lapply(scafList, function(i){
   #i=scafList[2]
@@ -599,7 +611,7 @@ seqData<-  lapply(scafList, function(i){
 sequences<-list()
 names<-list()
 for (i in 1:length(seqData)){
-  names<-c(names, seqData[[i]][1])
+  names<-c(names, gsub("(.*)(_scaf.*)","\\1",seqData[[i]][1]))
   sequences<-c(sequences,seqData[[i]][2])
 }
 
@@ -693,13 +705,14 @@ if(length(resultsEachScaf)>1){
   ######
   print(paste("writing gff file:", paste(working_dir, input_name, ".gff", sep="")))
   
-  writeLines(text=paste(c(mainHeaderA,scafHeaderA),sep = "\n"),
-             con =  paste(working_dir, input_name, ".gff", sep=""))
+  # writeLines(text=paste(c(mainHeaderA,scafHeaderA),sep = "\n"),
+  #            con =  paste(working_dir, input_name, ".gff", sep=""))
   # write.table(x = gff3df, 
   #             append = T,
   #             col.names = F,row.names = F,
   #             file = paste(working_dir, input_name, ".gff", sep=""), 
   #             sep="\t", quote = F)
+  gtfdf$strand<-ifelse( is.na(gtfdf$strand),".",as.character(gtfdf$strand))
   write.table(x = gtfdf, 
               append = F,
               col.names = F,row.names = F,
@@ -769,19 +782,20 @@ if(length(resultsEachScaf)>1){
     gtfdf<-gtfdf[order(gtfdf$start),]
     
     ######
-    cat(scafHeaderA,append = T,sep="\n",
-        file =  paste(working_dir, input_name, ".gff", sep=""))
+
+    # cat(scafHeaderA,append = T,sep="\n",
+    #     file =  paste(working_dir, input_name, ".gff", sep=""))
     # write.table(x = gff3df, 
     #             append = T,
     #             col.names = F,row.names = F,
     #             file = paste(working_dir, input_name, ".gff", sep=""), 
     #             sep="\t", quote = F)
+    gtfdf$strand<-ifelse( is.na(gtfdf$strand),".",as.character(gtfdf$strand))
     write.table(x = gtfdf, 
                 append = T,
                 col.names = F,row.names = F,
                 file = paste(working_dir, input_name, ".gtf", sep=""), 
                 sep="\t", quote = F)
-    
   }
 } else{
   finalDF<-resultsEachScaf[[1]]
@@ -866,22 +880,22 @@ if(length(resultsEachScaf)>1){
   gtfdf<-gtfdf[order(gtfdf$start),]
   
 ######
-  print(paste("writing gff file:", paste(working_dir, input_name, ".gff", sep="")))
+
+  print(paste("writing gtf file:", paste(working_dir, input_name, ".gff", sep="")))
   
-  writeLines(text=paste(c(mainHeaderA,scafHeaderA),sep = "\n"),
-             con =  paste(working_dir, input_name, ".gff", sep=""))
+  # writeLines(text=paste(c(mainHeaderA,scafHeaderA),sep = "\n"),
+  #            con =  paste(working_dir, input_name, ".gff", sep=""))
   # write.table(x = gff3df, 
   #             append = T,
   #             col.names = F,row.names = F,
   #             file = paste(working_dir, input_name, ".gff", sep=""), 
   #             sep="\t", quote = F)
+  gtfdf$strand<-ifelse( is.na(gtfdf$strand),".",as.character(gtfdf$strand))
   write.table(x = gtfdf, 
               append = F,
               col.names = F,row.names = F,
               file = paste(working_dir, input_name, ".gtf", sep=""), 
               sep="\t", quote = F)
-  
-  
 }
 
 #  And they all lived happily ever after
@@ -899,7 +913,7 @@ write.csv(finalDF, paste(working_dir, input_name, ".csv", sep=""))
 print(paste("writing fasta file:",paste(working_dir, input_name, ".fasta", sep="")))
 write.fasta(names = names,
             sequences =sequences,as.string = T,
-              nbchar = 80,open = "a",
+              nbchar = 80,
             file.out =  paste(working_dir, input_name, ".fasta", sep=""))
 
 

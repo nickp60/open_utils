@@ -7,8 +7,8 @@ Created on Tue Feb 24 13:39:09 2015
 ##################               Brinsmade Lab                #################
 @author: Nick Waters
 
-#                             Version 4.2
-#                               20151217
+#                             Version 4.3
+#                               20160315
 #
 #   About:  this script is essentially a wrapper for NCBI BLAST+, the 
 #           standalone version. Give it a genome(.gb), and a fasta file to blast against
@@ -20,7 +20,7 @@ Created on Tue Feb 24 13:39:09 2015
 #   -fixed the hack to recast malformed dataframe (index, record iterations, etc)
 #
 #   Minor version revisions:
-#   -added optional grep arg for pulling out locus tags
+#   -fixed error bug looking for "i" instead of "locus"
 #
 # 
 #   Requires: -installation of BioPython and NCBI Blast+ standalone suite
@@ -219,8 +219,19 @@ if os.path.exists(test_path_query)and remake_blast_db is False:
 else:
     print(str("Creating BLAST database for "+gb+"..."))
     subprocess.Popen(make_db_command_query, stdout=subprocess.PIPE,  shell=True).stdout.read()
+#%% Add  to home directory to BLASTDB
+#TODO test if already there
+#test_if_in_BLASTDB='''echo "$BLASTDB" | grep -e '$HOME/BLAST' '''
+#test_if_in_BLASTDB=str('''echo "$BLASTDB" | grep -e "var" ''')
 
-     
+#subprocess.Popen(test_if_in_BLASTDB, stdout=subprocess.PIPE,  shell=True).stdout.read()
+
+
+
+#%blastdbset_command='export BLASTDB=$BLASTDB:$HOME/BLAST'#subprocess.Popen(blastdbset_command, stdout=subprocess.PIPE,  shell=True).stdout.read()
+#%% TEST if worked
+#subprocess.Popen("export", stdout=subprocess.PIPE, shell=True).stdout.read()
+
 #%% Blast query against target
  #path to blast database for target 
 bdb_path=os.path.join(os.path.abspath("BLAST"), bdb_name)
@@ -254,7 +265,7 @@ def xml_to_df(record):
     for rec in record:
         locus=str(rec.query.partition(" ")[2].partition("|")[0])
         if locus in df.locus_tag.values:
-            print("Caution, possible duplicate %s;  locus_tag must be unique" %i)
+            print("Caution, possible duplicate %s;  locus_tag must be unique" %locus)
             line_index=counter
             df.loc[line_index, "locus_tag"]=locus
             counter=counter+1            
@@ -273,11 +284,14 @@ querydf =  xml_to_df(record)
 targetdf = xml_to_df(record_recip)
 #%%
 
-d2 = pd.DataFrame(targetdf.match_in_target.str.split("|").tolist(), columns=genbankdf.columns[2:6],index=np.arange(len(targetdf))+1 )
+d2 = pd.DataFrame(targetdf.match_in_target.str.split("|").tolist(), columns=genbankdf.columns[2:6],index=np.arange(targetdf.shape[0])+1 )
 #%%targetdf.match_in_target=d2.locus_tag
 targetdf=targetdf.sort_values(by="match_in_target")
 targetdf.reset_index(level=0, inplace=True)
-querydf=querydf.sort_values(by="locus_tag")
+try:
+    querydf=querydf.sort_values(by="locus_tag")
+except AttributeError:
+    print("pandas is outdated; please upgrade\n")
 
 #%%
 #TODO: use bit score and gaps to create homologue filtering schema
