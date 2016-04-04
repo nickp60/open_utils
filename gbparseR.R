@@ -6,15 +6,15 @@ DEBUG<-F
 #
 #                         by Nick Waters
 #                           20160325
-#                         Version 0.3.93
+#                         Version 0.3.94
 ################################################################################
 ################################################################################
 
 #   Usage: $ Rscript gbparseR.R input.gb  output_path *upstream_ and_downstream_bps
 #                                                     *optional
 
-# Minor update 0.3.93 
-#fixed NA's in strand
+# Minor update 0.3.94 
+#fixed product
 
 #  known bugs:  need to make support for joined CDS's , ie:
 # "complement(join(332323..2323,223234.2342325.))
@@ -264,7 +264,7 @@ extract_features<-function(data, ranges, locus_tag="locus_tag", debug=F){ #y=gre
             gsub("(.*\\s*/transl_table=)(.*)","\\2", 
                  grep("transl_table",entry, value=T )), silent=T)
       try(z[z$id==i, "product"]<-
-            gsub("(.*\\s*/product=)(\")(.*)(\")","\\3", grep("product",entry, value=T )),
+            gsub("(.*\\s*/product=)(.*)","\\2",grep("product",entry, value=T )),
           silent=T)
       try(z[z$id==i, "protein_id"]<-
             gsub("(.*\\s*/protein_id=)(\")(.*)(\")","\\3", 
@@ -580,6 +580,7 @@ resultsEachScaf<-  lapply(scafList, function(i){
   ranges<-get_ranges(returns[[2]])
   ranges<-clean_ranges_rna(ranges, returns[[2]])
   ranges<-extract_features(data=returns[[2]],ranges =  ranges,locus_tag = "locus_tag")
+  ranges$product<-gsub("\"","", ranges$product)
   result<-get_seqs(gbdf = ranges, seq = returns[[3]], upstream = upstream, downstream = downstream)
   result$scaffold<-gsub("(.*)(_scaf.*)","\\1", i)
   return(result)

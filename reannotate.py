@@ -97,12 +97,14 @@ else:
     print("Making directory %s..." % subdirname)
     os.makedirs(subdirname)
 input_handle = open(input_genome,"r") #  input database
-aaoutput_handle = open(os.path.join(subdirname, gb+"aa.fasta"),"w") #  #  Amino Acid output
-aaoutput_path=os.path.join(subdirname, gb+"aa.fasta")  #  Amino Acid output path
+aaoutput_handle = open(os.path.join(subdirname, gb+".fa"),"w") #  #  Amino Acid output
+aaoutput_path=os.path.join(subdirname, gb+".fa")  #  Amino Acid output path
 # for constructing a blastDB
-output_genfasta_handle = open(os.path.join(subdirname, gb+"_genomic.fasta"), "w")
-#test_path= "../testFasta.fasta"
-#test_handle=open(test_path, "w")
+
+
+### TODO
+#output_genfasta_handle = open(os.path.join(subdirname, gb+"_genomic.fasta"), "w")
+
 blast_path= os.path.join(subdirname, gb+"_vs_"+bdb_name+".xml")   #  Blast output path xml
 blast_path_recip= os.path.join(subdirname, bdb_name+"_vs_"+gb+".xml")   #  Blast output path xml
 blastcsv_path=os.path.join(subdirname,gb+"_vs_"+bdb_name+".csv")#  Blast output path csv
@@ -151,23 +153,23 @@ aaseqList=[]
 def prepare_for_blastn(x):    
     for content in x.itertuples():
         a=Seq(str(content[7]), IUPAC.unambiguous_dna)
-        b=SeqRecord(seq=a, id= str(content[1]),
-                    description=str(content[3]+
+        b=SeqRecord(seq=a, id= str(content[1]), #id
+                    description=str(content[3]+ 
                     "|"+str(content[2])+
                     '|'+str(content[4])+
                     '|'+str(content[5])))
         nseqList.append(b)
 
 if nuc_flag=="T":
-    noutput_handle=open(os.path.join(subdirname, gb+"n.fasta"),"w") #  Nucleotide output
-    noutput_path = os.path.join(subdirname, gb+"n.fasta")   #  Nucleotide output
-    print(str("Writing out nucleotide .fasta to\n"+ noutput_path+"..."))
+    noutput_handle=open(os.path.join(subdirname, gb+".fn"),"w") #  Nucleotide output
+    noutput_path = os.path.join(subdirname, gb+".fn")   #  Nucleotide output
+    print(str("Writing out nucleotide .fn to\n"+ noutput_path+"..."))
     prepare_for_blastn(genbankdf)
     SeqIO.write(nseqList, noutput_handle, "fasta")
     noutput_handle.close()
 else: pass
 #%%  make that dataframe into a protein fasta  
-print(str("Writing out protein .fasta to \n"+ aaoutput_path+"..."))
+print(str("Writing out protein .fn to \n"+ aaoutput_path+"..."))
 def prepare_for_blastaa(x):
     for content in x.itertuples():
         for locus_tag in content[3]:
