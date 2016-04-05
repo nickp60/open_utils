@@ -6,7 +6,7 @@
 #      acceptable sanatized inputs
 test_args<-c("~/GitHub/R/")
 
-arg_handle_help<-function(x, help_message="help message here", version="0.0"){
+arg_handle_help<-function(x, help_message="help message here", version="0.0", test_args=test_args){
   y=" " # begin with space to separate collapsed args
   for (i in 1:length(x)){
     y<-paste(y,x[i], sep=" ")
@@ -20,9 +20,13 @@ arg_handle_help<-function(x, help_message="help message here", version="0.0"){
   }
   if(grepl(" -H | -h | --help ",y)){
     print(help_message)
+    print("such as:")
+    print(test_args)
+    stop("Stopping script. Rerun without help flag")
   }
   if(grepl(" -v | -V | --version ",y)){
     print(paste("version:",version))
+    stop("Stopping script. Rerun without version flag")
   }
 }
 
@@ -62,6 +66,10 @@ arg_string<-function(x, to_lower=F){
 }
 arg_integer<-function(x){
   try(x<-as.integer(x))
+  return(x)
+}
+arg_numeric<-function(x){
+  try(x<-as.numeric(x))
   return(x)
 }
 arg_bool<-function(x){

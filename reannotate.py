@@ -58,7 +58,7 @@ DEBUG=False
 #%% 
 #define inputs
 remake_blast_db=False
-nuc_flag=True
+nuc_flag=False
 if DEBUG:
     input_genome = os.path.expanduser("~/GitHub/BlastDBs/uams1.gb")
     input_target_fasta = os.path.expanduser("~/GitHub/BlastDBs/CP000253_8325.fasta")
@@ -70,15 +70,22 @@ else:
     Requires a .gb file as the query and a protein fasta as the target for reannotation')
     parser.add_argument("query_db", help="path to .gb or .gbk Genbank genome file")
     parser.add_argument("target_db", help="target amino acid fasta file to compare your query genome to")
-    parser.add_argument("-n","--nucleotide", help="T if you need a nucleotide fasta returned", type=bool)
-    parser.add_argument("-r","--remake", help="T if you need a nucleotide fasta returned", type=bool)
+    parser.add_argument("-n","--nucleotide", help="T if you need a nucleotide fasta returned")
+    parser.add_argument("-r","--remake", help="T if you want to remake the blast databases")
     parser.add_argument("-g","--grep_pattern", default='(.*gene=)(.*?)](.*)', help="grep pattern for isolating the locus_tag in the target fasta", type=str)
     args = parser.parse_args()    
     input_genome = args.query_db
     input_target_fasta = args.target_db
-    nuc_flag= args.nucleotide
+    if str(args.nucleotide).lower() =="t" or str(args.nucleotide).lower() =="true" :
+        nuc_flag=True
+    else:
+        nuc_flag=False
     pattern=args.grep_pattern
-    remake_blast_db= args.remake
+    if str(args.remake).lower() =="t" or str(args.remake).lower() =="true" :
+        remake_blast_db=True
+    else:
+        remake_blast_db=False
+
 
 #%%
 #print(str("input_target_fasta is "+ input_target_fasta)) # sanity check 
@@ -102,8 +109,7 @@ aaoutput_path=os.path.join(subdirname, gb+".fa")  #  Amino Acid output path
 # for constructing a blastDB
 
 
-### TODO
-#output_genfasta_handle = open(os.path.join(subdirname, gb+"_genomic.fasta"), "w")
+output_genfasta_handle = open(os.path.join(subdirname, gb+"_genomic.fasta"), "w")
 
 blast_path= os.path.join(subdirname, gb+"_vs_"+bdb_name+".xml")   #  Blast output path xml
 blast_path_recip= os.path.join(subdirname, bdb_name+"_vs_"+gb+".xml")   #  Blast output path xml
@@ -141,6 +147,7 @@ for record in SeqIO.parse(input_handle, "genbank"):
 genbankdf.reset_index(level=0, inplace=True)
 # set up recipient structures
 #print(genbankdf.loc[genbankdf['locus_tag'] == 'QV15_00005'])   ### just a test      
+SeqIO.convert(input_handle.name, "genbank", output_genfasta_handle, "fasta")
 
 
 if DEBUG:
@@ -160,7 +167,7 @@ def prepare_for_blastn(x):
                     '|'+str(content[5])))
         nseqList.append(b)
 
-if nuc_flag=="T":
+if nuc_flag==True:
     noutput_handle=open(os.path.join(subdirname, gb+".fn"),"w") #  Nucleotide output
     noutput_path = os.path.join(subdirname, gb+".fn")   #  Nucleotide output
     print(str("Writing out nucleotide .fn to\n"+ noutput_path+"..."))
