@@ -6,15 +6,20 @@ DEBUG<-F
 #
 #                         by Nick Waters
 #                           20160325
-#                         Version 0.3.94
+#                         Version 0.4.
 ################################################################################
 ################################################################################
 
 #   Usage: $ Rscript gbparseR.R input.gb  output_path *upstream_ and_downstream_bps
 #                                                     *optional
+# Major update
+# -made steps to deal with the joined/order loci.  the first step was to add a few lines to the split_if
+#  scafforlded function that collapses those lines that include a linebreak
+# -also removed empty lines
 
-# Minor update 0.3.94 
-#fixed product
+# - next, the get-ranges functions was changed to get start and end of ranges
+
+
 
 #  known bugs:  need to make support for joined CDS's , ie:
 # "complement(join(332323..2323,223234.2342325.))
@@ -41,7 +46,7 @@ DEBUG<-F
 #source.file ="~/GitHub/BlastDBs/FPR3757_LAC.gb"
 #source.file ="~/GitHub/BlastDBs/TCH1516.gb"
 if(DEBUG){
-  args<-c("~/uams1_rs.gb","../gbparse_output/", "500")
+  args<-c("~/GitHub/BlastDBs/genbank_genomes/MRSA252.gb","~/GitHub/R/gbparse_output/", "500")
 } else{
   args<-commandArgs(TRUE)
 }
@@ -75,12 +80,12 @@ print(paste("genome source file: ", source.file))
 print(paste("output directory: ", working_dir))
 print(paste("upsteam and downstream region width: ", upstream))
 ################################################################################
-####  Extract each scaffold and write out to files in a new 
+####  Extract each sequence and write out to files in a new 
 ####  directory
 split_if_scaffolded<-function(source.file){
   input <- readLines(source.file)
   if(length(grep("LOCUS", input))>1){
-    print("splitting scaffolds into two files for easier handling...") 
+    print("splitting sequences into two files for easier handling...") 
 #    scaffs<-length(grep("LOCUS", input))
     scaffCoords<-c(grep("LOCUS", input), length(input))
     for( i in 1:(length(scaffCoords)-1)){#print(i)}
@@ -92,12 +97,28 @@ split_if_scaffolded<-function(source.file){
               splitInput<-input[scaffCoords[i]:scaffCoords[i+1]-1],
               splitInput<-input[scaffCoords[i]:scaffCoords[i+1]])
       print(scaffFileName)
+      for (i in 1:(length(splitInput)-1)){
+        if(grepl("[order|join]\\(.*,$", splitInput[i])){
+          splitInput[i]<-paste(splitInput[i],gsub(" ","",splitInput[i+1]),sep='')
+          splitInput[i+1]<-""
+        }
+      }
+      splitInput<-splitInput[splitInput!=""]
       write(splitInput, scaffFileName)
     }
   } else{
     scaf<-gsub(" *","", 
                gsub("VERSION (.*) (.*)","\\1", grep("VERSION", input, value = T)))
-    print(paste("saving formatted scaffold:",paste(scaf, "_scaf_1.txt", sep="")))
+    print(paste("saving formatted sequence:",paste(scaf, "_scaf_1.txt", sep="")))
+ # unwrap lines
+    for (i in 1:(length(input)-1)){
+      if(grepl("[order|join]\\(.*,$", input[i])){#print(i)}}
+        input[i]<-paste(input[i],gsub(" ","",input[i+1]), sep="")
+        input[i+1]<-""
+        print(input[i])
+      }
+    }
+    input<-input[input!=""] #remove empty lines
     write(input, paste(scaf, "_scaf_1.txt", sep=""))
   }
   gc()
@@ -143,13 +164,17 @@ clean_sequence<-function(seq){#} (seq in grep("seq\\d", ls(), value=T)){#print(s
 ###  start making  dataframe containing the location coordinates
 get_ranges<-function(x){
   if (grep("FEATURES", x)!=1){stop}   #  make sure its 
+  # unwrap location lines
+  
   x<-c(x, " 27..27 ")  #  hey there, buffer row
   # extract ranges 
   featList<-  #  note!  this removes ">" exception from locus; see exception in tag"
     gsub("\\)|\\,|\\(|-","", 
          gsub("(\\D*)(\\d+\\.{2}[\\>,0-9]{1}\\d*)(\\)*.*)", "\\2", 
               
-              grep("(\\d*\\.{2}\\d*)",x, value=T)))
+              grep("(\\d*\\.{2}\\d*)",x, value=T)
+              ))
+  featlist<-grep("join\\(|complement\\(|\\ \\d*\\.{2}\\d*", x, value=T)
   #featList<-gsub("#clean ranges
   indexList<-grep("(\\d+\\.{2}[\\>,0-9]{1}\\d*)",x)
   preZ<-data.frame(index= indexList, loc=featList, stringsAsFactors = F)
@@ -220,6 +245,13 @@ extract_features<-function(data, ranges, locus_tag="locus_tag", debug=F){ #y=gre
                                      #################### are b/w "gene" and "CDS"
     entry<-data[ranges[ranges$id==i,"index"]:ranges[ranges$id==j,"index"]]
     entry_head<-entry[1:entry_end]
+    if(debug){print(entry[1])}
+    #skip spiced loci
+    if(grepl("order",entry[1])){
+      print(paste("Sorry, at this point, this can't handle the spliced loci found at ", i, sep=''))
+      z[z$id==i, "type"]<-"spliced_locus"
+      next()
+    }
     #}#  quick check
     if(!any(grepl("source|repeat_region|STS|tmRNA|assembly_gap|misc_feature|misc_binding|CDS|misc_RNA|rRNA|ncRNA|tRNA", 
                   entry_head))){
@@ -252,7 +284,7 @@ extract_features<-function(data, ranges, locus_tag="locus_tag", debug=F){ #y=gre
                  grep("inference",entry, value=T )),silent=T)
       #    z[i, "sequence_ref"]<-
       #      gsub("(.*\\s*\\sequence:)(.*)","\\2", grep("sequence:",entry, value=T ))
-      z[z$id==i, "direction"]<-ifelse(!any(grepl("complement",entry_head)), "leading", "compliment")
+      z[z$id==i, "strand"]<-ifelse(!any(grepl("complement",entry_head)), "+", "-")
       try(z[z$id==i, "note"]<-
             gsub("  ","",paste0(entry[grep("note=", entry): 
                                         (grep("codon_start",entry)-1)], collapse="  ")),
@@ -287,8 +319,8 @@ extract_features<-function(data, ranges, locus_tag="locus_tag", debug=F){ #y=gre
       
       z[z$id==i,"locus_tag"]<-
         gsub("(.*?\")(.*)", "\\2",  pre_locus)
-      z[z$id==i, "direction"]<-
-        ifelse(!any(grepl("complement", entry_head)), "leading", "compliment")
+      z[z$id==i, "strand"]<-
+        ifelse(!any(grepl("complement", entry_head)), "+", "-")
       try(z[z$id==i, "note"]<-
             gsub("  ","",paste0(entry[grep("note=", entry): 
                                         (grep("codon_start",entry)-1)], collapse="  ")),
@@ -304,8 +336,8 @@ extract_features<-function(data, ranges, locus_tag="locus_tag", debug=F){ #y=gre
       
       z[z$id==i,"locus_tag"]<-
         gsub("(.*?\")(.*)", "\\2",  pre_locus)
-      z[z$id==i, "direction"]<-
-        ifelse(!any(grepl("complement", entry_head)), "leading", "compliment")
+      z[z$id==i, "strand"]<-
+        ifelse(!any(grepl("complement", entry_head)), "+", "-")
       try(z[z$id==i, "product"]<-
             gsub("(.*\\s*/product=)(\")(.*)(\")","\\3", grep("product",entry, value=T )),
           silent=T)
@@ -326,16 +358,16 @@ extract_features<-function(data, ranges, locus_tag="locus_tag", debug=F){ #y=gre
             gsub("(.*\\s*\\old_locus_tag=\")(.*)(\")","\\2", 
                  grep("old_locus_tag=",entry, value=T )[1]), silent=T)
       
-      z[z$id==i,"locus_tag"]<-
-        gsub("(.*?\")(.*)", "\\2",  pre_locus)
-      z[z$id==i, "direction"]<-
-        ifelse(!any(grepl("complement", entry_head)), "leading", "compliment")
+      try(z[z$id==i,"locus_tag"]<-
+        gsub("(.*?\")(.*)", "\\2",  pre_locus),silent=T)
+      try(z[z$id==i, "strand"]<-
+        ifelse(!any(grepl("complement", entry_head)), "+", "-"), silent=T)
       try(z[z$id==i, "note"]<-
             gsub("  ","",paste0(entry[grep("note=", entry): 
                                         (grep("codon_start",entry)-1)], collapse="  ")),
           silent=T)
-      z[z$id==i, "product"]<-
-        gsub("(.*\\s*/product=)(\")(.*)(\")","\\3", grep("product",entry, value=T ))
+      try(z[z$id==i, "product"]<-
+        gsub("(.*\\s*/product=)(\")(.*)(\")","\\3", grep("product",entry, value=T )), silent=T)
       #####
     } else if(any(grepl("misc_feature", entry_head))){
       z[z$id==i, "type"]<-"misc_feature"
@@ -343,8 +375,8 @@ extract_features<-function(data, ranges, locus_tag="locus_tag", debug=F){ #y=gre
             gsub("(.*\\s*\\old_locus_tag=\")(.*)(\")","\\2", 
                  grep("old_locus_tag=",entry, value=T )[1]), silent=T)
       
-      z[z$id==i, "direction"]<-
-        ifelse(!any(grepl("complement", entry_head)), "leading", "compliment")
+      z[z$id==i, "strand"]<-
+        ifelse(!any(grepl("complement", entry_head)), "+", "-")
       try(z[z$id==i, "note"]<-
         gsub("  ","",paste0(entry[grep("note=\"", entry): (length(entry)-1)], collapse="  ")),silent=T)
       #####
@@ -354,8 +386,8 @@ extract_features<-function(data, ranges, locus_tag="locus_tag", debug=F){ #y=gre
             gsub("(.*\\s*\\old_locus_tag=\")(.*)(\")","\\2", 
                  grep("old_locus_tag=",entry, value=T )[1]), silent=T)
       
-      z[z$id==i, "direction"]<-ifelse(!any(grepl("complement", entry_head)), 
-                                      "leading", "compliment")
+      z[z$id==i, "strand"]<-ifelse(!any(grepl("complement", entry_head)), 
+                                      "+", "-")
       try(z[z$id==i, "note"]<-
             gsub("  ","",
                  paste0(entry[grep("note=", entry):
@@ -460,9 +492,9 @@ extract_features<-function(data, ranges, locus_tag="locus_tag", debug=F){ #y=gre
 ################################################################################
 # this function extracts the nucleotide sequence from the .gb file, along with 
 #upstream and downstream regions of interest
-get_seqs<-function(gbdf, seq, upstream=500, downstream=500){
+get_seqs<-function(gbdf, seq, upstream=500, downstream=500, DEBUG=F){
   idlist<-gbdf[gbdf$type !="source","id"]
-  for( i in idlist){ #print(i)}
+  for( i in idlist){# print(i)}
     #gbdf["id"==i, "seq"]<- 
     gbdf[gbdf$id==i,"dnaseq"]<-
       substr(seq, gbdf[gbdf$id==i, "loc_start"], gbdf[gbdf$id==i, "loc_end"])
@@ -478,7 +510,7 @@ get_seqs<-function(gbdf, seq, upstream=500, downstream=500){
      # print(paste("id:",i))
       # 15 is the approx limit to the RBS
     gbdf[gbdf$id==i,"preceeding_intergenic_region"]<-
-      ifelse(gbdf[gbdf$id==i, "direction"]=="leading",
+      ifelse(gbdf[gbdf$id==i, "strand"]=="+",
         substr(seq, gbdf[gbdf$id==i-1, "loc_end"]+15,gbdf[gbdf$id==i, "loc_start"]-15),
         substr(seq, gbdf[gbdf$id==i, "loc_end"]+15,gbdf[gbdf$id==i+1, "loc_start"]-15))
     }
@@ -486,11 +518,11 @@ get_seqs<-function(gbdf, seq, upstream=500, downstream=500){
   }
   gbdf$region<-paste(gbdf$dnaseq_upstream, toupper(gbdf$dnaseq), gbdf$dnaseq_downstream, sep="")
   gbdf$search_region<-
-    ifelse(gbdf$direction=="leading",
+    ifelse(gbdf$strand=="+",
            paste(gbdf$dnaseq_upstream, toupper(substr(gbdf$dnaseq, 1, 50)), sep=""),
            paste(toupper(substr(gbdf$dnaseq, nchar(gbdf$dnaseq)-50, nchar(gbdf$dnaseq))), gbdf$dnaseq_downstream, sep=""))
   gbdf$prom_region<- 
-    ifelse(gbdf$direction=="leading",
+    ifelse(gbdf$strand=="+",
            paste(substr(gbdf$dnaseq_upstream,   1, (nchar(gbdf$dnaseq_upstream)-15)), sep=""),
            paste(substr(gbdf$dnaseq_downstream, 15, nchar(gbdf$dnaseq_downstream)), sep=""))
 
@@ -553,14 +585,14 @@ write.fasta<-function (sequences, names, file.out, open = "w", nbchar = 60,
 ##################
 
 ################################################################################
-#  Alrighty now, time to make this work for multiple sscaffolds. Test with a single
-#  scaffold first, then move on to more ambitious pursuits of having this search the
+#  Alrighty now, time to make this work for multiple ssequences. Test with a single
+#  sequence first, then move on to more ambitious pursuits of having this search the
 #  folder for the scaf*.txt files
-#  UPDATE this, as of 20151208, works with uams-1 genome with 2 scaffolds.
+#  UPDATE this, as of 20151208, works with uams-1 genome with 2 sequences.
 
 split_if_scaffolded(source.file)
 print(paste("Found ",length(grep("scaf.*", dir())),
-            " scaffold(s) in the current directory: (", getwd(), ")", sep=""))
+            " sequence(s) in the current directory: (", getwd(), ")", sep=""))
 print(grep("scaf.+", dir(), value=T))
 
 scafList<-as.list(grep("scaf.*", dir(), value=T))
@@ -579,10 +611,10 @@ resultsEachScaf<-  lapply(scafList, function(i){
   #
   ranges<-get_ranges(returns[[2]])
   ranges<-clean_ranges_rna(ranges, returns[[2]])
-  ranges<-extract_features(data=returns[[2]],ranges =  ranges,locus_tag = "locus_tag")
+  ranges<-extract_features(data=returns[[2]],ranges =  ranges,locus_tag = "locus_tag")#, debug = T)
   ranges$product<-gsub("\"","", ranges$product)
   result<-get_seqs(gbdf = ranges, seq = returns[[3]], upstream = upstream, downstream = downstream)
-  result$scaffold<-gsub("(.*)(_scaf.*)","\\1", i)
+  result$sequence<-gsub("(.*)(_scaf.*)","\\1", i)
   return(result)
   }
 )
@@ -598,7 +630,7 @@ resultsEachScaf<-lapply(1:length(resultsEachScaf), function(x){
 })
 
 
-#  extract just the sequences for scaffold fasta output
+#  extract just the sequences for sequence fasta output
 seqData<-  lapply(scafList, function(i){
   #i=scafList[2]
   #i=source.file
@@ -661,22 +693,22 @@ if(length(resultsEachScaf)>1){
       return("SO:0000143")
     }
   })
-  gff3df<-data.frame("seqid"     = finalDF$scaffold,
+  gff3df<-data.frame("seqid"     = finalDF$sequence,
                      "source"    ="Genbank via gbParse.R",
                      "type"      = finalDF$type,
                      "start"     = finalDF$loc_start,
                      "end"       = finalDF$loc_end,
                      "score"     = ".",
-                     "strand"    = ifelse(finalDF$direction=="leading", "+","-"),
+                     "strand"    = ifelse(finalDF$strand=="+", "+","-"),
                      "phase"     = "0",
                      "attributes"= attributes)
-  gtfdf<-data.frame("seqid"     = finalDF$scaffold,
+  gtfdf<-data.frame("seqid"     = finalDF$sequence,
                      "source"    ="Genbank via gbParse.R",
                      "type"      = finalDF$type,
                      "start"     = finalDF$loc_start,
                      "end"       = finalDF$loc_end,
                      "score"     = ".",
-                     "strand"    = ifelse(finalDF$direction=="leading", "+","-"),
+                     "strand"    = ifelse(finalDF$strand=="+", "+","-"),
                      "frame"     = "0",
                      "attributes"= attributesGTF)
   mainHeaderA<-"##gff-version 3"
@@ -740,22 +772,22 @@ if(length(resultsEachScaf)>1){
       'gene_id "',interm$locus_tag,'";',
       'transcript_id "', interm$locus_tag, '";',
       sep='')
-    gff3df<-data.frame("seqid"     = interm$scaffold,
+    gff3df<-data.frame("seqid"     = interm$sequence,
                        "source"    ="Genbank via gbParse.R",
                        "type"      = unlist(interm),
                        "start"     = interm$loc_start,
                        "end"       = interm$loc_end,
                        "score"     = ".",
-                       "strand"    = ifelse(interm$direction=="leading", "+","-"),
+                       "strand"    = ifelse(interm$strand=="+", "+","-"),
                        "phase"     = "0",
                        "attributes"= attributes)
-    gtfdf<-data.frame("seqid"     = interm$scaffold,
+    gtfdf<-data.frame("seqid"     = interm$sequence,
                       "source"    ="Genbank via gbParse.R",
                       "type"      = interm$type,
                       "start"     = interm$loc_start,
                       "end"       = interm$loc_end,
                       "score"     = ".",
-                      "strand"    = ifelse(interm$direction=="leading", "+","-"),
+                      "strand"    = ifelse(interm$strand=="+", "+","-"),
                       "frame"     = "0",
                       "attributes"= attributesGTF)
     #    mainHeaderA<-"##gff-version 3"
@@ -839,22 +871,22 @@ if(length(resultsEachScaf)>1){
     }
   })
   
-  gff3df<-data.frame("seqid"     = finalDF$scaffold,
+  gff3df<-data.frame("seqid"     = finalDF$sequence,
                      "source"    ="Genbank via gbParse.R",
                      "type"      = unlist(gff3type),
                      "start"     = finalDF$loc_start,
                      "end"       = finalDF$loc_end,
                      "score"     = ".",
-                     "strand"    = ifelse(finalDF$direction=="leading", "+","-"),
+                     "strand"    = ifelse(finalDF$strand=="+", "+","-"),
                      "phase"     = "0",
                      "attributes"= attributes)
-  gtfdf<-data.frame("seqid"     = finalDF$scaffold,
+  gtfdf<-data.frame("seqid"     = finalDF$sequence,
                     "source"    ="Genbank via gbParse.R",
                     "type"      = finalDF$type,
                     "start"     = finalDF$loc_start,
                     "end"       = finalDF$loc_end,
                     "score"     = ".",
-                    "strand"    = ifelse(finalDF$direction=="leading", "+","-"),
+                    "strand"    = ifelse(finalDF$strand=="+", "+","-"),
                     "frame"     = "0",
                     "attributes"= attributesGTF, stringsAsFactors = F)
   mainHeaderA<-"##gff-version 3"
