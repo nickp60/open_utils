@@ -115,7 +115,7 @@ split_if_scaffolded<-function(source.file){
       if(grepl("[order|join]\\(.*,$", input[i])){#print(i)}}
         input[i]<-paste(input[i],gsub(" ","",input[i+1]), sep="")
         input[i+1]<-""
-        print(input[i])
+#        print(input[i])
       }
     }
     input<-input[input!=""] #remove empty lines
@@ -164,8 +164,6 @@ clean_sequence<-function(seq){#} (seq in grep("seq\\d", ls(), value=T)){#print(s
 ###  start making  dataframe containing the location coordinates
 get_ranges<-function(x){
   if (grep("FEATURES", x)!=1){stop}   #  make sure its 
-  # unwrap location lines
-  
   x<-c(x, " 27..27 ")  #  hey there, buffer row
   # extract ranges 
   featList<-  #  note!  this removes ">" exception from locus; see exception in tag"
@@ -174,27 +172,35 @@ get_ranges<-function(x){
               
               grep("(\\d*\\.{2}\\d*)",x, value=T)
               ))
-  featlist<-grep("join\\(|complement\\(|\\ \\d*\\.{2}\\d*", x, value=T)
-  #featList<-gsub("#clean ranges
   indexList<-grep("(\\d+\\.{2}[\\>,0-9]{1}\\d*)",x)
   preZ<-data.frame(index= indexList, loc=featList, stringsAsFactors = F)
+  ####  get full location
+  subsetted<-x[indexList] # get all the location lines in your input
+  preZ$loc_overall_end<-
+    gsub("(.*?)(\\d*)\\.[\\.|\\.>](\\d*).*?$", "\\3", subsetted) 
+  preZ$loc_overall_start<-
+    gsub("(.*?)(\\d*)\\.\\.(.*)", "\\2",subsetted)
+  preZ$loc<-
+    paste(preZ$loc_overall_start,"..", preZ$loc_overall_end,sep="")
+  preZ$loc_overall_end<-NULL
+  preZ$loc_overall_start<-NULL
   # this next bit gets rid of duplicates;  neat, huh?
   for (i in 2:length(preZ$loc)){
     if (preZ[i-1,"loc"]==preZ[i, "loc"]){preZ[i,"loc"]<-"NA"}
   }
   preZ<-preZ[preZ$loc != "NA",]
-  z<-preZ   
+  z<-preZ    
   z$id<-1:nrow(z) #relevel id's
-  z$loc_start<-as.numeric(gsub("(\\d*)(\\.\\.[\\>,0-9]{1}\\d*)", "\\1", z$loc))
+  z$loc_start<-as.numeric(gsub("(\\d*)(\\.\\...*)", "\\1", z$loc))
   z$loc_end<-as.numeric(gsub (">","", gsub("(\\d*\\.\\.)(\\d*)", "\\2", z$loc)))
   z$next_loc<-unlist(c(lapply(z$id[1:nrow(z)-1], function(w){       #  get start of next locus
     as.numeric(z[z$id==w+1, "loc_start"])}), 0))
-  z$loc<-NULL
+#  z$loc<-NULL
   z
   
 }
 #^^^^^^^^^ 
-#ranges<-get_ranges(returns[[2]])
+#ranges<-get_ranges(x=returns[[2]])
 
 
 ################################################################################
@@ -224,7 +230,7 @@ clean_ranges_rna<-function(gl, data){
 
 #  this extracts the features, augmenting the ranges dataframe with gene info, 
 #  type, etc
-extract_features<-function(data, ranges, locus_tag="locus_tag", debug=F){ #y=grep("\\sgene\\s", x)[1]
+extract_features<-function(data, ranges, locus_tag="locus_tag", DEBUG=F){ #y=grep("\\sgene\\s", x)[1]
   
   #   check for buffer row, stop if  absent
   if(tail(ranges,1)$loc_start!=27 | tail(ranges,1)$loc_end != 27){
@@ -232,7 +238,7 @@ extract_features<-function(data, ranges, locus_tag="locus_tag", debug=F){ #y=gre
   }
   z<-ranges
   for (i in ranges[1,"id"]:(ranges[nrow(ranges),"id"]-1)){ #  print(i)}
-    if(debug){print(i)} # print lines
+    if(DEBUG){print(i)} # print lines
     #  can this be made into an apply?
     j<-i+1
     hits<-grep("\\d+\\.\\.[\\>,0-9]{1}\\d*",  # ">" is part of a new convention for stuff?
@@ -245,12 +251,11 @@ extract_features<-function(data, ranges, locus_tag="locus_tag", debug=F){ #y=gre
                                      #################### are b/w "gene" and "CDS"
     entry<-data[ranges[ranges$id==i,"index"]:ranges[ranges$id==j,"index"]]
     entry_head<-entry[1:entry_end]
-    if(debug){print(entry[1])}
+    if(DEBUG){print(entry[1])}
     #skip spiced loci
     if(grepl("order",entry[1])){
-      print(paste("Sorry, at this point, this can't handle the spliced loci found at ", i, sep=''))
-      z[z$id==i, "type"]<-"spliced_locus"
-      next()
+      print(paste("spliced loci found at ", i, sep=''))
+      z[z$id==i, "spliced"]<-"spliced"
     }
     #}#  quick check
     if(!any(grepl("source|repeat_region|STS|tmRNA|assembly_gap|misc_feature|misc_binding|CDS|misc_RNA|rRNA|ncRNA|tRNA", 
@@ -600,7 +605,7 @@ scafList<-as.list(grep("scaf.*", dir(), value=T))
 #resultsAll<-  lapply(scafList, function(i){
 #fastaString<-""
 resultsEachScaf<-  lapply(scafList, function(i){
-  #i=scafList[2]
+  #i=scafList[1]
   #i=source.file
   i=unlist(i)
   outName<-gsub("(.*)(\\.txt)","\\1", i )
