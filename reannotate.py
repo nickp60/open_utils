@@ -7,8 +7,8 @@ Created on Tue Feb 24 13:39:09 2015
 ##################               Brinsmade Lab                #################
 @author: Nick Waters
 
-#                             Version 4.3
-#                               20160315
+#                             Version 4.6
+#                               20160413
 #
 #   About:  this script is essentially a wrapper for NCBI BLAST+, the 
 #           standalone version. Give it a genome(.gb), and a fasta file to blast against
@@ -20,7 +20,7 @@ Created on Tue Feb 24 13:39:09 2015
 #   -fixed the hack to recast malformed dataframe (index, record iterations, etc)
 #
 #   Minor version revisions:
-#   -fixed error bug looking for "i" instead of "locus"
+#   - fixed iterator that rewrote over prior entries in dataframe
 #
 # 
 #   Requires: -installation of BioPython and NCBI Blast+ standalone suite
@@ -28,7 +28,8 @@ Created on Tue Feb 24 13:39:09 2015
 #             
 #   Questions? nickp60@gmail.com
 #             
-#   USAGE: python reannotate.py input.gb target.fasta
+#   USAGE: python reannotate.py input.gb target.fasta new_grep_pattern*
+# *optional
 #
 #   OUTPUT: this will return a csv with the genome reannotations for used with 
 #           downstream R applications.  Additionally, it will output the BLAST
@@ -60,8 +61,8 @@ DEBUG=False
 remake_blast_db=False
 nuc_flag=False
 if DEBUG:
-    input_genome = os.path.expanduser("~/GitHub/BlastDBs/uams1.gb")
-    input_target_fasta = os.path.expanduser("~/GitHub/BlastDBs/CP000253_8325.fasta")
+    input_genome = os.path.expanduser("~/GitHub/BlastDBs/genbank_genomes/uams1.gb")
+    input_target_fasta = os.path.expanduser("~/GitHub/BlastDBs/fasta_genomes/MRSA252.txt")
     nuc_flag=True
     remake_blast_db=True
     pattern='(.*gene=)(.*?)](.*)'
@@ -126,25 +127,49 @@ print(str("Reading .gb file..."))
 
 #TODO: make this less awful
 genbankdf=pd.DataFrame()  ## genbank List Long
+qualifiers=["old_locus_tag","locus_tag","protein_id", "db_xref", "translation", "gene"]
+index=0
 for record in SeqIO.parse(input_handle, "genbank"):
-    for index, feature in enumerate(record.features):
+    for feature in record.features:
+        index=index+1
         if feature.type != "CDS":
             continue
         try:
-            if feature.qualifiers.has_key("old_locus_tag"):
-                genbankdf.loc[index, "old_locus_tag"]=str(feature.qualifiers["old_locus_tag"]).replace("\'", "").replace("[", "",).replace("]", "")
-            else:
-                genbankdf.loc[index, "old_locus_tag"]="none"
-            genbankdf.loc[index, "locus_tag"]=str(feature.qualifiers["locus_tag"]).replace("\'", "").replace("[", "",).replace("]", "")
-            genbankdf.loc[index, "product"]      =str(feature.qualifiers["product"]).replace("\'", "").replace("[", "",).replace("]", "")
-            genbankdf.loc[index, "protein_id"]   =str(feature.qualifiers["protein_id"]).replace("\'", "").replace("[", "",).replace("]", "") 
-            genbankdf.loc[index, "db_xref"]      =str(feature.qualifiers["db_xref"]).replace("\'", "").replace("[", "",).replace("]", "")
-            genbankdf.loc[index, "seq"]          =str(feature.location.extract(record).seq)
-            genbankdf.loc[index, "translation"]  =str(feature.qualifiers["translation"]).replace("\'", "").replace("[", "",).replace("]", "")        
-            genbankdf.loc[index, "type"]="CDS"
+            for qualifier in qualifiers:
+                try:
+                    genbankdf.loc[index,qualifier]=str(feature.qualifiers[qualifier]).replace("\'", "").replace("[", "",).replace("]", "")
+                except KeyError:
+                     genbankdf.loc[index,qualifier]='none'
+                genbankdf.loc[index, "seq"] =str(feature.location.extract(record).seq)
+                genbankdf.loc[index, "type"]="CDS"
         except KeyError:
             genbankdf.loc[index, "type"] = "pseudo" 
+
+#%%
+#this should handle casses (like MW2) where there is no locus_tag designation
+#ie, this should rarely be called 
+if ((genbankdf.locus_tag=='none').all() & (genbankdf.gene=="none").all()):
+    invalid_genbank=KeyError("Genbank file must have at either unique locus_tag column or gene column")
+    raise invalid_genbank
+elif ((genbankdf.locus_tag=='none').all() & (genbankdf.gene!="none").all()):
+    genbankdf["locus_tag"]=genbankdf["gene"]
+else:
+    pass
+if (genbankdf.old_locus_tag=='none').all():
+    genbankdf["old_locus_tag"]=genbankdf["locus_tag"]
+
+if (genbankdf.locus_tag=='none').any():
+    print("Warning! removing %i entries lacking locus_tag.." %len(genbankdf[genbankdf.locus_tag=='none']))
+    genbankdf=genbankdf[genbankdf.locus_tag!="none"]
+
 genbankdf.reset_index(level=0, inplace=True)
+#  we split with pipes "|" later on;  this rmoves any from locus_tags , bd_xref's, and old_locus_tags
+try:
+    genbankdf.db_xref=genbankdf.db_xref.str.replace("|","_")
+    genbankdf.locus_tag=genbankdf.locus_tag.str.replace("|","_")
+    genbankdf.old_locus_tag=genbankdf.old_locus_tag.str.replace("|","_")
+except KeyError:
+    pass
 # set up recipient structures
 #print(genbankdf.loc[genbankdf['locus_tag'] == 'QV15_00005'])   ### just a test      
 SeqIO.convert(input_handle.name, "genbank", output_genfasta_handle, "fasta")
@@ -159,14 +184,12 @@ aaseqList=[]
 
 def prepare_for_blastn(x):    
     for content in x.itertuples():
-        a=Seq(str(content[7]), IUPAC.unambiguous_dna)
-        b=SeqRecord(seq=a, id= str(content[1]), #id
-                    description=str(content[3]+ 
-                    "|"+str(content[2])+
-                    '|'+str(content[4])+
-                    '|'+str(content[5])))
+        a=Seq(str(content.seq), IUPAC.unambiguous_dna)
+        b=SeqRecord(seq=a, id= str(content.Index), #id
+                    description=str(content.locus_tag+ 
+                    "|"+str(content.old_locus_tag)+
+                    '|'+str(content.db_xref)))
         nseqList.append(b)
-
 if nuc_flag==True:
     noutput_handle=open(os.path.join(subdirname, gb+".fn"),"w") #  Nucleotide output
     noutput_path = os.path.join(subdirname, gb+".fn")   #  Nucleotide output
@@ -179,16 +202,15 @@ else: pass
 print(str("Writing out protein .fn to \n"+ aaoutput_path+"..."))
 def prepare_for_blastaa(x):
     for content in x.itertuples():
-        for locus_tag in content[3]:
+        for locus_tag in content.locus_tag:
             if locus_tag in aaseqList:
                 print("warning!  Duplicate %s entry" %locus_tag)
                 next
-        a=Seq(str(content[8]), IUPAC.protein)
-        b=SeqRecord(seq=a, id= str(content[1]),
-                    description=str(content[3]+
-                    "|"+str(content[2])+
-                    '|'+str(content[4])+
-                    '|'+str(content[5])))
+        a=Seq(str(content.translation), IUPAC.protein)
+        b=SeqRecord(seq=a, id= str(content.Index), #id
+                    description=str(content.locus_tag+ 
+                    "|"+str(content.old_locus_tag)+
+                    '|'+str(content.db_xref)))
         aaseqList.append(b)
 prepare_for_blastaa(genbankdf)
 SeqIO.write(aaseqList, aaoutput_handle, "fasta")
@@ -247,10 +269,10 @@ bdb_path=os.path.join(os.path.abspath("BLAST"), bdb_name)
 bdb_path_recip=os.path.join(os.path.abspath("BLAST"), gb)
 # build commandline call
 blast_cline = NcbiblastpCommandline(query=aaoutput_path, 
-                                    db= bdb_path,  evalue=0.001,
+                                    db= bdb_path,  evalue=0.01,
                                     outfmt=5, out=blast_path)
 blast_cline_recip = NcbiblastpCommandline(query=input_target_fasta, 
-                                    db= str(bdb_path_recip+"_db"),  evalue=0.001,
+                                    db= str(bdb_path_recip+"_db"),  evalue=0.01,
                                     outfmt=5, out=blast_path_recip)
 # last I checked, I couldnt figure out how to add this through the python blast api                                    
 add_params=" -num_threads 2 -max_target_seqs 1 -max_hsps_per_subject 1"
@@ -292,8 +314,9 @@ def xml_to_df(record):
 querydf =  xml_to_df(record)
 targetdf = xml_to_df(record_recip)
 #%%
-
-d2 = pd.DataFrame(targetdf.match_in_target.str.split("|").tolist(), columns=genbankdf.columns[2:6],index=np.arange(targetdf.shape[0])+1 )
+#create dataframe with gene information
+d2 = pd.DataFrame(targetdf.match_in_target.str.split("|").tolist(), 
+                  columns=["locus_tag","old_locus_tag", "db_xref"],index=np.arange(targetdf.shape[0])+1 )
 #%%targetdf.match_in_target=d2.locus_tag
 targetdf=targetdf.sort_values(by="match_in_target")
 targetdf.reset_index(level=0, inplace=True)
@@ -301,11 +324,8 @@ try:
     querydf=querydf.sort_values(by="locus_tag")
 except AttributeError:
     print("pandas is outdated; please upgrade\n")
-
 #%%
 #TODO: use bit score and gaps to create homologue filtering schema
-
-
 #TODO pretest for uniqueness?
 len(targetdf.match_in_target)!=len(set(targetdf.match_in_target))
 #%% judge reciprocity
@@ -344,14 +364,11 @@ for i in querydf.locus_tag: #for each locus tag in query,
                 print("womp")
     else:
         print("womp")
-
-
 #%%
 #TODO make sure this handles all cases well
-
-new=pd.merge(genbankdf, querydf, on='locus_tag')#, suffixes=['_left', '_right'])
+print("there were %i not found in query" %(abs(len(querydf)-len(genbankdf))))
+new=pd.merge(genbankdf, querydf,how="left", on='locus_tag')#, suffixes=['_left', '_right'])
 #%% separate match_in_target with grep
-
 #TODO can this be sped up?
 if len(pattern)>0:
     genelist=list()

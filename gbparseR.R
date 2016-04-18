@@ -6,7 +6,7 @@ DEBUG<-F
 #
 #                         by Nick Waters
 #                           20160325
-#                         Version 0.4.
+#                         Version 0.4.5
 ################################################################################
 ################################################################################
 
@@ -16,7 +16,9 @@ DEBUG<-F
 # -made steps to deal with the joined/order loci.  the first step was to add a few lines to the split_if
 #  scafforlded function that collapses those lines that include a linebreak
 # -also removed empty lines
-
+#
+# Minor Updates
+# - fixed the fasta output in order to match ncbi standards
 # - next, the get-ranges functions was changed to get start and end of ranges
 
 
@@ -590,9 +592,7 @@ write.fasta<-function (sequences, names, file.out, open = "w", nbchar = 60,
 ##################
 
 ################################################################################
-#  Alrighty now, time to make this work for multiple ssequences. Test with a single
-#  sequence first, then move on to more ambitious pursuits of having this search the
-#  folder for the scaf*.txt files
+#  Alrighty now, This is the real start of the fun
 #  UPDATE this, as of 20151208, works with uams-1 genome with 2 sequences.
 
 split_if_scaffolded(source.file)
@@ -919,7 +919,7 @@ if(length(resultsEachScaf)>1){
   
 ######
 
-  print(paste("writing gtf file:", paste(working_dir, input_name, ".gff", sep="")))
+  print(paste("writing gtf file:", paste(working_dir, input_name, ".gtf", sep="")))
   
   # writeLines(text=paste(c(mainHeaderA,scafHeaderA),sep = "\n"),
   #            con =  paste(working_dir, input_name, ".gff", sep=""))
@@ -948,12 +948,31 @@ write.csv(finalDF, paste(working_dir, input_name, ".csv", sep=""))
 # 
 # # writeLines(fastaString,
 # #            con = paste(working_dir, input_name, ".fasta", sep=""))
-print(paste("writing fasta file:",paste(working_dir, input_name, ".fasta", sep="")))
+print(paste("writing fasta file:",paste(working_dir, input_name, "_sequence.fn", sep="")))
 write.fasta(names = names,
             sequences =sequences,as.string = T,
               nbchar = 80,
-            file.out =  paste(working_dir, input_name, ".fasta", sep=""))
+            file.out =  paste(working_dir, input_name, "_sequence.fn", sep=""))
 
+# for(i in c("locus_tag","old_locus_tag","gene","db_xref")){
+#   finalDF[,i]<-gsub(" ","",finalDF[,i])
+# }
+finalDF<-finalDF[!is.na(finalDF$locus_tag),]
+for(i in unique(finalDF$sequence)){
+  finalDF[finalDF$sequence==i, "outputid"]<-1:nrow(finalDF[finalDF$sequence==i,])
+}
+#http://www.ncbi.nlm.nih.gov/toolkit/doc/book/ch_demo/?rendertype=table#ch_demo.T5
+protein_names<-as.list(paste("lcl|",finalDF$sequence,"_", finalDF$outputid,
+                             " [geneRS=",finalDF$locus_tag,
+                             "][gene=",finalDF$locus_tag,"][protein=",finalDF$product,
+                    "][db_xref=",finalDF$db_xref,"]", sep=''))
+protein_seq<-as.list(finalDF$translation)
+output_path_fa  <- paste(working_dir, input_name, ".fa", sep="")
+#output_path<-paste("~/Desktop/MEME/","MEME_", gsub("-|:|\\D", "", Sys.time()),"_",output_name,"_",protein, "_input.fasta", sep="")
+print(paste("Writing ", length(protein_seq)," sequences to ", output_path,sep=""))
+write.fasta(sequences=protein_seq, 
+            names=protein_names, nbchar = 60, 
+            file.out= output_path_fa, open = "w")
 
 ##
 
