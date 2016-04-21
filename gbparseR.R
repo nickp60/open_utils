@@ -524,6 +524,7 @@ get_seqs<-function(gbdf, seq, upstream=500, downstream=500, DEBUG=F){
     #gbdf["id"==i, "upstrea"]
   }
   gbdf$region<-paste(gbdf$dnaseq_upstream, toupper(gbdf$dnaseq), gbdf$dnaseq_downstream, sep="")
+  #upstream with 50bp of gene
   gbdf$search_region<-
     ifelse(gbdf$strand=="+",
            paste(gbdf$dnaseq_upstream, toupper(substr(gbdf$dnaseq, 1, 50)), sep=""),
