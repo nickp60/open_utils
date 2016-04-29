@@ -7,7 +7,7 @@ Created on Tue Feb 24 13:39:09 2015
 ##################               Brinsmade Lab                #################
 @author: Nick Waters
 
-#                             Version 4.6
+#                             Version 4.7
 #                               20160413
 #
 #   About:  this script is essentially a wrapper for NCBI BLAST+, the 
@@ -20,8 +20,9 @@ Created on Tue Feb 24 13:39:09 2015
 #   -fixed the hack to recast malformed dataframe (index, record iterations, etc)
 #
 #   Minor version revisions:
-#   - fixed iterator that rewrote over prior entries in dataframe
-#
+#   - created option to rename genomic fasta headers
+#TODO
+#   make renamer work with subprocess; had issues with using awk from within python
 # 
 #   Requires: -installation of BioPython and NCBI Blast+ standalone suite
 #             -make a directory called "BLAST" in your home folder
@@ -66,6 +67,7 @@ if DEBUG:
     nuc_flag=True
     remake_blast_db=True
     pattern='(.*gene=)(.*?)](.*)'
+    rename_fa=True
 else:
     parser = argparse.ArgumentParser(description='Reciprocal blast for crude genome reannotation. \
     Requires a .gb file as the query and a protein fasta as the target for reannotation')
@@ -74,6 +76,7 @@ else:
     parser.add_argument("-n","--nucleotide", help="T if you need a nucleotide fasta returned")
     parser.add_argument("-r","--remake", help="T if you want to remake the blast databases")
     parser.add_argument("-g","--grep_pattern", default='(.*gene=)(.*?)](.*)', help="grep pattern for isolating the locus_tag in the target fasta", type=str)
+    parser.add_argument("-f","--rename_fa", help="T  if you would like to try to simplify the names in the resulting genomic fasta file")
     args = parser.parse_args()    
     input_genome = args.query_db
     input_target_fasta = args.target_db
@@ -81,6 +84,10 @@ else:
         nuc_flag=True
     else:
         nuc_flag=False
+    if str(args.rename_fa).lower() =="t" or str(args.nucleotide).lower() =="true" :
+        rename_fa=True
+    else:
+        rename_fa=False
     pattern=args.grep_pattern
     if str(args.remake).lower() =="t" or str(args.remake).lower() =="true" :
         remake_blast_db=True
@@ -108,10 +115,6 @@ input_handle = open(input_genome,"r") #  input database
 aaoutput_handle = open(os.path.join(subdirname, gb+".fa"),"w") #  #  Amino Acid output
 aaoutput_path=os.path.join(subdirname, gb+".fa")  #  Amino Acid output path
 # for constructing a blastDB
-
-
-output_genfasta_handle = open(os.path.join(subdirname, gb+"_genomic.fasta"), "w")
-
 blast_path= os.path.join(subdirname, gb+"_vs_"+bdb_name+".xml")   #  Blast output path xml
 blast_path_recip= os.path.join(subdirname, bdb_name+"_vs_"+gb+".xml")   #  Blast output path xml
 blastcsv_path=os.path.join(subdirname,gb+"_vs_"+bdb_name+".csv")#  Blast output path csv
@@ -170,10 +173,51 @@ try:
     genbankdf.old_locus_tag=genbankdf.old_locus_tag.str.replace("|","_")
 except KeyError:
     pass
-# set up recipient structures
 #print(genbankdf.loc[genbankdf['locus_tag'] == 'QV15_00005'])   ### just a test      
+#%%#%%#  make a fasta for genomic sequence(s), clean up header in resulting file
+output_genfasta_handle = open(os.path.join(subdirname, gb+"_genomic.fasta"), "w")
 SeqIO.convert(input_handle.name, "genbank", output_genfasta_handle, "fasta")
+output_genfasta_handle.close()
+#%%
 
+if rename_fa:
+    print("After running this script, run the following output as a command, starting with 'awk' and ending with _renamed.fasta:")
+    import string
+    input_handle = open(input_genome,"r") #  input database
+    names=[]
+    for record in SeqIO.parse(input_handle, "genbank"):
+        print(record.id)
+        names.append(record.id)
+    if len(names)>1:
+        starts_at=names[0][-1]
+        base_name=names[0].partition(".")[0][0:-1] # removes number, period, and version number
+        length_of_names=len(names)
+        version_of_genbank=re.sub("(.*)\.(.*)$",r"\2", names[0])
+        if not string.ascii_letters.find(starts_at)==-1:
+            name_not_digit= KeyError("not actally a key error, but at this point, fastas can only be renamed if the sequence ends in a digit :(")
+            raise name_not_digit
+        if not string.ascii_letters.find(starts_at)==-1:
+            version_not_digit= KeyError("not actally a key error, but at this point, fastas can only be renamed if the version ends in a digit :(")
+            raise version_not_digit
+        if not int(starts_at)==1:
+            version_not_digit= KeyError("not actally a key error, but at this point, fastas can only be renamed if the version starts with 1 :(")
+            raise version_not_digit
+        renaming_script=str(r"""awk '/^>/{print ">"""+base_name+"""" ++i "."""+version_of_genbank+r""" "; next}{print}' < """+output_genfasta_handle.name +" > "+str(output_genfasta_handle.name.partition(".fasta")[0]+"_renamed.fasta"))
+        print(renaming_script)
+    elif len(names)==1:
+        name= names[0]
+        renaming_script=str(r"""awk '/^>/{print ">"""+name+""""; next}{print}' < """+output_genfasta_handle.name +" > "+str(output_genfasta_handle.name.partition(".fasta")[0]+"_renamed.fasta"))
+        print(renaming_script)
+    else:
+        print("something funny happened when preparing the renaming script")
+print("\n\n")
+
+# TODO
+#    proc=subprocess.Popen(renaming_script, shell=True)
+#    proc.wait()
+#    print proc.returncode
+#%%
+# set up recipient structures
 
 if DEBUG:
     testdf=genbankdf[6:15]    ####Use this to debug creation of SeqRecord dictionary

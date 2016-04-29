@@ -1,18 +1,19 @@
 ########################################################################
 #                            NargParse.R
-#                              version 0.2
-#                             by Nick Waters 20160420
-#   Simple functions for commandline tool development in R to provide simple ways of setting 
-#      acceptable sanatized inputs
+#                              version 0.2.2
+#                             by Nick Waters 20160421
+# minor version changes:
+#  -made unique names
+#  -added $ to fight against flags matching partial other flags.  This should probably be watched! 
 
 test_args<-c("~/GitHub/R/")
 
-arg_handle_help<-function(x, help_message="help message here", version="0.0", def_args=test_args){
+arg_handle_help<-function(args_vector, help_message2="help message here", version="0.0", def_args=test_args){
   CONTINUE_bool=F
   y=" " # begin with space to separate collapsed args
-  if(length(x)==0) stop("No arguments given!  run with -h to see usage")
-  for (i in 1:length(x)){
-    y<-paste(y,x[i], sep=" ")
+  if(length(args_vector)==0) stop("No arguments given!  run with -h to see usage")
+  for (i in 1:length(args_vector)){
+    y<-paste(y,args_vector[i], sep=" ")
   }
   y=paste(y," ", sep="") #add spaces to collapsed args
   if (!is.vector(y)){
@@ -22,7 +23,7 @@ arg_handle_help<-function(x, help_message="help message here", version="0.0", de
     stop("invalid help message")
   }
   if(grepl(" -H | -h | --help ",y)){
-    cat(help_message)
+    cat(help_message2)
 #    cat("such as:")
 #    cat(def_args)
     stop("Stopping script. Rerun without help flag")
@@ -105,15 +106,18 @@ arg_bool<-function(x){
 
 #  x is your commandArgs vector
 # this will check to make sure all the required flags are there, and parse all to named vector without the dashes
-parse_flagged_args<-function(x, required=NULL, optional=NULL, help_message="help message here",
+parse_flagged_args<-function(x, required=NULL, optional=NULL, help_message=NULL,
                              version="0.0",test_args=test_args,DEBUG=F){
   if(DEBUG){
     x=c("-i", "~/GitHub/R/","-j", "15","-o", "none")
     required=c("-i","-j" )
     optional=c("-o")
   }
-  ifelse(arg_handle_help(x = x, help_message = help_message, version =  version),
-         "parsing args...",stop("Try again without version or help flags", call.=F))
+  if(!arg_handle_help(args_vector = x, help_message2 = help_message, version =  version)){
+    stop("Try again without version or help flags")
+  } else{
+    print("parsing args...")
+    }
   options_used<-c(required, optional[optional%in%x])
   args_output<-c()
   # check against numeric flags
@@ -127,7 +131,7 @@ parse_flagged_args<-function(x, required=NULL, optional=NULL, help_message="help
     if(options_used[i] %in% required & !any(grepl(options_used[i], x))){
       stop(paste("Required arguments: ", required, ";\n missing ",options_used[i], sep="" ))
     }
-    x_loc<-grep(options_used[i], x)
+    x_loc<-grep(paste(options_used[i],"$", sep=''), x)
     thing<-x[x_loc+1] # get the next thing right after the flag
     #
     names(thing)<-gsub('^-', '', options_used[i])
