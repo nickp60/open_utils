@@ -8,7 +8,9 @@
 
 test_args<-c("~/GitHub/R/")
 
-arg_handle_help<-function(args_vector, help_message2="help message here", version="0.0", def_args=test_args){
+arg_handle_help<-function(args_vector,  version="0.0", def_args=test_args, ...){
+  # elipsis is to pass help_message down function chain
+  if(is.na(help_message)){ help_message="help message here"}
   CONTINUE_bool=F
   y=" " # begin with space to separate collapsed args
   if(length(args_vector)==0) stop("No arguments given!  run with -h to see usage")
@@ -23,7 +25,7 @@ arg_handle_help<-function(args_vector, help_message2="help message here", versio
     stop("invalid help message")
   }
   if(grepl(" -H | -h | --help ",y)){
-    cat(help_message2)
+    cat(help_message)
 #    cat("such as:")
 #    cat(def_args)
     stop("Stopping script. Rerun without help flag")
@@ -108,12 +110,13 @@ arg_bool<-function(x){
 # this will check to make sure all the required flags are there, and parse all to named vector without the dashes
 parse_flagged_args<-function(x, required=NULL, optional=NULL, help_message=NULL,
                              version="0.0",test_args=test_args,DEBUG=F){
+  print(paste("Help message:", help_message))
   if(DEBUG){
     x=c("-i", "~/GitHub/R/","-j", "15","-o", "none")
     required=c("-i","-j" )
     optional=c("-o")
   }
-  if(!arg_handle_help(args_vector = x, help_message2 = help_message, version =  version)){
+  if(!arg_handle_help(args_vector = x, version =  version)){
     stop("Try again without version or help flags")
   } else{
     print("parsing args...")
