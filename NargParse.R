@@ -1,16 +1,13 @@
 ########################################################################
 #                            NargParse.R
-#                              version 0.2.2
+#                              version 0.2.3
 #                             by Nick Waters 20160421
 # minor version changes:
-#  -made unique names
-#  -added $ to fight against flags matching partial other flags.  This should probably be watched! 
-
+#  improved arg_bool to have defaults
 test_args<-c("~/GitHub/R/")
-
-arg_handle_help<-function(args_vector,  version="0.0", def_args=test_args, ...){
+arg_handle_help<-function(args_vector,  version="0.0", def_args=test_args, help_message2=help_message){
   # elipsis is to pass help_message down function chain
-  if(is.na(help_message)){ help_message="help message here"}
+  if(is.null(help_message2)){ help_message2="help message here"}
   CONTINUE_bool=F
   y=" " # begin with space to separate collapsed args
   if(length(args_vector)==0) stop("No arguments given!  run with -h to see usage")
@@ -21,13 +18,11 @@ arg_handle_help<-function(args_vector,  version="0.0", def_args=test_args, ...){
   if (!is.vector(y)){
     stop("args not a vector!")
   }
-  if(!is.character(help_message)){
+  if(!is.character(help_message2)){
     stop("invalid help message")
   }
   if(grepl(" -H | -h | --help ",y)){
-    cat(help_message)
-#    cat("such as:")
-#    cat(def_args)
+    cat(help_message2)
     stop("Stopping script. Rerun without help flag")
   }
   if(grepl(" -v | -V | --version ",y)){
@@ -89,18 +84,25 @@ arg_integer<-function(x){
   try(x<-as.integer(x))
   return(x)
 }
-arg_numeric<-function(x){
-  try(x<-as.numeric(x))
-  return(x)
+arg_numeric<-function(x, type=c( "numeric")){
+  if(type=="integer"){
+    try(x<-as.integer(x))
+    return(x)
+  } else if (type=="numeric"){
+    try(x<-as.numeric(x))
+    return(x)
+  }
 }
-arg_bool<-function(x){
-  try(x<-as.logical(x))
-  return(x)
+arg_bool<-function(x, default=F){
+  if(is.numeric(x)) stop("cant convert numeric arguments to logical!")
+  if(is.na(as.logical(x))){
+    return(default)
+  } else{
+  return(as.logical(x))
+  }
 }
-
-
 ######################   Flagged Args ################################
-#  this will be agnistic to things like '-h' vs '--help'.  Too much work for now.
+#  this will be agnostic to things like '-h' vs '--help'.  Too much work for now.
 #  this will be for pythonic flags with the dashes, but not exclusively, to
 #    avoid the issue with negative numbers as arguments
 
@@ -110,18 +112,18 @@ arg_bool<-function(x){
 # this will check to make sure all the required flags are there, and parse all to named vector without the dashes
 parse_flagged_args<-function(x, required=NULL, optional=NULL, help_message=NULL,
                              version="0.0",test_args=test_args,DEBUG=F){
-  print(paste("Help message:", help_message))
   if(DEBUG){
     x=c("-i", "~/GitHub/R/","-j", "15","-o", "none")
     required=c("-i","-j" )
     optional=c("-o")
   }
-  if(!arg_handle_help(args_vector = x, version =  version)){
+  if(!arg_handle_help(args_vector = x, version =  version, help_message2 = help_message)){
     stop("Try again without version or help flags")
   } else{
-    print("parsing args...")
+    if(DEBUG) print("parsing args...")
     }
   options_used<-c(required, optional[optional%in%x])
+  for( i in options_used){if(length(grep(paste0("^",i,"$"), x))>1) stop("Do you have repeated flags?")}
   args_output<-c()
   # check against numeric flags
   if(!all(is.na(suppressWarnings(sapply(c(optional, required), as.numeric))))){ stop("Cannot have numeric flags!")}
