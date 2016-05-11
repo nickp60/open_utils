@@ -145,5 +145,21 @@ parse_flagged_args<-function(x, required=NULL, optional=NULL, help_message=NULL,
   return(args_output)
 }
 
+################################################################################
+test_for_required_header<-function(df, df_title="test",custom_fail_message="",required=c(), minimum_additional=0, verbose=T){
+  # given a data.frame, this tests for the pressense of required columns.  Additional arguments allow you to name the test for error messages, give a verbose output, and require a number of additonal columns
+  header<-colnames(df)
+  for (i in required){
+    if(!i %in% header){
+      print(paste("Required column names for", df_title, ":", required))
+      print(custom_fail_message)
+      stop(paste("Missing column named",i,"; Double check your (case sensive) header row!"))
+    }
+  }
+  if(table(required %in%header)[1]<minimum_additional){
+    stop("headers found, but no column for data is present")
+  }
+  if(verbose) print("all columns accounted for")
+}
 
 
