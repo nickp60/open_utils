@@ -80,11 +80,14 @@ arg_string<-function(x, to_lower=F){
   }
   return(x)
 }
-arg_integer<-function(x){
+arg_integer<-function(x){ #depreciate
   try(x<-as.integer(x))
   return(x)
 }
-arg_numeric<-function(x, type=c( "numeric")){
+arg_numeric<-function(x, type=c( "numeric"), default=1){
+  if(is.na(as.numeric(x))){
+    return(default)
+  }
   if(type=="integer"){
     try(x<-as.integer(x))
     return(x)
