@@ -1,5 +1,7 @@
 #!/usr/bin/env python
 
+#version 0.2
+
 # quick and dirty script to fetch genes from NCBI when given a file cintaining NCBI accession numbers, blast them against a local database (from makeblastdb), and concatenate the results into a single csv  
 # usage python snagnblast.py text_file_with_accessions.txt /BLAST/directory/ /output/directory/
 
@@ -25,7 +27,7 @@ DEBUG=True
 remake_blast_db=False
 nuc_flag=False
 if DEBUG:
-    genelist = os.path.expanduser("~/GitHub/FB/Ecoli_comparative_genomics/data/test_virgenes.txt")
+    genelist = os.path.expanduser("~/GitHub/FB/Ecoli_comparative_genomics/data/test_virgenes.tsv")
     blastdb = os.path.expanduser("~/BLAST/env_Coli")
     output = os.path.expanduser("~/GitHub/FB/GitHub/FB/Ecoli_comparative_genomics/")  
     score_min = 70
@@ -50,7 +52,23 @@ max_results=200
 
 #out_handle=open(str(output.strip()+".fasta"), "w")
 genes=open(genelist, "r")
-accessions=genes.readlines()
+if genes.name.endswith("txt"):
+    genelist_type="txt"
+    accessions=genes.readlines()
+elif genes.name.endswith( "tsv"):  #if the input is tabular, accesions must be in the first column
+    genelist_type="delim"
+    n=("accession","name","phenotype",	"function","genome",	"note","source")
+    genedf= pd.read_csv(genes, sep="\t", names=n, index_col=False)
+    accessions= genedf.iloc[1:, 0].tolist()
+    accessions = [x for x in accessions if str(x) != 'nan']
+elif genes.name.endswith("csv"):
+    genelist_type="delim"
+    n=("accession",	"name","phenotype",	"function",	"genome",	"note",	"source")
+    genedf= pd.read_csv(genes, sep=",", names=n)
+    accessions= genedf.iloc[1:, 0].tolist()
+    accessions = [x for x in accessions if str(x) != 'nan']
+else:
+    print("REading error")
 sequence_handle= Entrez.efetch(db="nucleotide", id=accessions, rettype="fasta")
 seqs=SeqIO.parse(sequence_handle, "fasta")
 fasta_output= open("sequences.fa", "w") 
@@ -71,5 +89,16 @@ print("Running BLAST search...")
 subprocess.Popen(blast_command, stdout=subprocess.PIPE,  shell=True).stdout.read()
 
 #%%
-colnames=["query id", "subject id", "% identity", "alignment length", "mismatches", "gap opens", "q. start", "q. end", "s. start", "s. end", "evalue", "bit score"]
+colnames=["query_id", "subject_id", "identity_perc", "alignment_length", "mismatches", "gap_opens", "q. start", "q. end", "s. start", "s. end", "evalue", "bit score"]
 csv_results=pd.read_csv(open(str(os.path.dirname(blastdb)+os.path.sep+"results.tab")), comment="#", sep="\t" , names=colnames  )
+csv_results[,"query id"]
+#%%
+if genelist_type=="delim":
+    results_annotated=pd.merge(csv_results, genedf left_on=")
+    
+    
+    
+    
+    
+    
+    
