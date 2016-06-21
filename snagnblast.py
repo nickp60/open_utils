@@ -1,23 +1,30 @@
 #!/usr/bin/env python
+"""
+version 0.3
+Minor version changes:
+ -now merges accession file with output to transfer over any other metadata and writes back out
+ - text input should ignore hash-commented lines
+ 
+ 
+ Quick and dirty script to fetch genes from NCBI when given a file cintaining NCBI accession numbers, 
+ blast them against a local database (from makeblastdb), and write out the results as a csv.
 
-#version 0.2
-
-# quick and dirty script to fetch genes from NCBI when given a file cintaining NCBI accession numbers, blast them against a local database (from makeblastdb), and concatenate the results into a single csv  
-# usage python snagnblast.py text_file_with_accessions.txt /BLAST/directory/ /output/directory/
-
+USAGE:
+ $ python snagnblast.py accessions.txt_or_accessions.csv /BLAST/directory/ /output/directory/
+"""
 import os
 #import sys
-import re
-import datetime
+#import re
+#import datetime
 import subprocess
 import argparse
 from Bio import SeqIO,Entrez
-from Bio.SeqRecord import SeqRecord
-from Bio.Seq import Seq
+#from Bio.SeqRecord import SeqRecord
+#from Bio.Seq import Seq
 import pandas as pd
-import numpy as np
-from Bio.Alphabet import IUPAC
-from Bio.Blast import NCBIXML
+#import numpy as np
+#from Bio.Alphabet import IUPAC
+#from Bio.Blast import NCBIXML
 from Bio.Blast.Applications import NcbiblastnCommandline
 DEBUG=True
 
@@ -29,7 +36,7 @@ nuc_flag=False
 if DEBUG:
     genelist = os.path.expanduser("~/GitHub/FB/Ecoli_comparative_genomics/data/test_virgenes.tsv")
     blastdb = os.path.expanduser("~/BLAST/env_Coli")
-    output = os.path.expanduser("~/GitHub/FB/GitHub/FB/Ecoli_comparative_genomics/")  
+    output = os.path.expanduser("~/GitHub/FB/Ecoli_comparative_genomics/")  
     score_min = 70
 else:
     parser = argparse.ArgumentParser(description="heres where the gelp message goes")
@@ -44,17 +51,18 @@ else:
     blastdb = args.blastdb
     output   = args.output
     score_min = args.score_min
-#%%  Grab sequences
+#%%  open accessions file, determine type, and parse
 Entrez.email = "nickp60@gmail.com"
 
-max_results=200
-
-
-#out_handle=open(str(output.strip()+".fasta"), "w")
 genes=open(genelist, "r")
 if genes.name.endswith("txt"):
     genelist_type="txt"
-    accessions=genes.readlines()
+    #accessions=genes.readlines()
+    accessions=[]
+    for line in genes:
+        li=line.strip()
+        if not li.startswith("#"):
+            accessions.append(line.rstrip())
 elif genes.name.endswith( "tsv"):  #if the input is tabular, accesions must be in the first column
     genelist_type="delim"
     n=("accession","name","phenotype",	"function","genome",	"note","source")
@@ -69,18 +77,21 @@ elif genes.name.endswith("csv"):
     accessions = [x for x in accessions if str(x) != 'nan']
 else:
     print("REading error")
+#%% Grab sequences from NCBI, write out resulting fasta file
 sequence_handle= Entrez.efetch(db="nucleotide", id=accessions, rettype="fasta")
 seqs=SeqIO.parse(sequence_handle, "fasta")
-fasta_output= open("sequences.fa", "w") 
-SeqIO.write(seqs, fasta_output, "fasta")
-fasta_output.close()
+with open(str(output+"sequences.fa"), "w") as fasta_output: 
+    SeqIO.write(seqs, fasta_output, "fasta")
+
 
 #%% Blast query against target
- #path to blast database for target 
+
 # build commandline call
+output_path_tab=str(output+"dcmegablast_results.tab")
+output_path_csv=str(output+"dcmegablast_results.csv")
 blast_cline = NcbiblastnCommandline(query=fasta_output.name, 
                                     db= blastdb,  evalue=10,
-                                    outfmt=7, out=str(os.path.dirname(blastdb)+os.path.sep+"results.tab"))
+                                    outfmt=7, out=output_path_tab)
 #%% last I checked, I couldnt figure out how to add this through the python blast api                                    
 add_params=" -num_threads 4 -max_target_seqs 2000 -task dc-megablast"
 #print(str(blast_cline)+add_params)
@@ -88,17 +99,15 @@ blast_command=str(str(blast_cline)+add_params)
 print("Running BLAST search...")
 subprocess.Popen(blast_command, stdout=subprocess.PIPE,  shell=True).stdout.read()
 
-#%%
-colnames=["query_id", "subject_id", "identity_perc", "alignment_length", "mismatches", "gap_opens", "q. start", "q. end", "s. start", "s. end", "evalue", "bit score"]
-csv_results=pd.read_csv(open(str(os.path.dirname(blastdb)+os.path.sep+"results.tab")), comment="#", sep="\t" , names=colnames  )
-csv_results[,"query id"]
-#%%
+#%% parse output
+colnames=["query_id", "subject_id", "identity_perc", "alignment_length", "mismatches", "gap_opens", "q_start", "q_end", "s_start", "s_end", "evalue", "bit_score"]
+csv_results=pd.read_csv(open(output_path_tab), comment="#", sep="\t" , names=colnames)
+#This regex will probably break things rather badly before too long...
+# it looks for capital letter and numbers, dot, number, ie SHH11555JJ8.99 
+csv_results["accession"]=csv_results.query_id.str.extract('(?P<accession>[A-Z \d]*\.\d*)') 
+#%% write out results with new headers or with new headers and merged metadat from accessions.tab
 if genelist_type=="delim":
-    results_annotated=pd.merge(csv_results, genedf left_on=")
-    
-    
-    
-    
-    
-    
-    
+    results_annotated=pd.merge(csv_results, genedf, how="left",  on="accession" )
+    results_annotated.to_csv(open(output_path_csv, "w") )
+else:
+    csv_results.to_csv(open(output_path_csv, "w") )
