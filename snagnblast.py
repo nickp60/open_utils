@@ -1,10 +1,9 @@
 #!/usr/bin/env python
 """
-version 0.3
+version 0.4
 Minor version changes:
- -now merges accession file with output to transfer over any other metadata and writes back out
- - text input should ignore hash-commented lines
- 
+ - implemented tblastx
+ - fixed csv header issues
  
  Quick and dirty script to fetch genes from NCBI when given a file cintaining NCBI accession numbers, 
  blast them against a local database (from makeblastdb), and write out the results as a csv.
@@ -26,6 +25,7 @@ import pandas as pd
 #from Bio.Alphabet import IUPAC
 #from Bio.Blast import NCBIXML
 from Bio.Blast.Applications import NcbiblastnCommandline
+from Bio.Blast.Applications import NcbitblastxCommandline
 DEBUG=True
 
 
@@ -34,29 +34,33 @@ DEBUG=True
 remake_blast_db=False
 nuc_flag=False
 if DEBUG:
-    genelist = os.path.expanduser("~/GitHub/FB/Ecoli_comparative_genomics/data/test_virgenes.tsv")
+    genelist = os.path.expanduser("~/GitHub/FB/Ecoli_comparative_genomics/data/test_virgenes.csv")
     blastdb = os.path.expanduser("~/BLAST/env_Coli")
-    output = os.path.expanduser("~/GitHub/FB/Ecoli_comparative_genomics/")  
+    output = os.path.expanduser("~/GitHub/FB/Ecoli_comparative_genomics/results/")  
     score_min = 70
+    blasttype="tblastx"
 else:
-    parser = argparse.ArgumentParser(description="heres where the gelp message goes")
-    parser.add_argument("genelist", help="file")
-    parser.add_argument("blastdb", help="target am genome to")
-    parser.add_argument("-o","--output", help="fasta returned")
-    parser.add_argument("-s","--score_min", help="T if you waabases")
+    parser = argparse.ArgumentParser(description="This script takes a list of gene accessions from either a text file or a csv, grabs the sequencs from NCBI, and proceeds to use either blastn or tblastx to detect the presence of the genes in a custom database")
+    parser.add_argument("genelist", help="file containing gene accessions.  if delimited, use the headers in the example file as a template")
+    parser.add_argument("blastdb", help="blastdb of interest")
+    parser.add_argument("-o","--output", help="directory in which to place the output files")
+    parser.add_argument("-s","--score_min", help="not currently used; will be used to determinine a scoring threshold")
+    parser.add_argument("-t","--blast_type", help="blastn or tblastx")
 
     args = parser.parse_args()    
 
     genelist = args.genelist
     blastdb = args.blastdb
+    blasttype=args.blasttype
     output   = args.output
     score_min = args.score_min
 #%%  open accessions file, determine type, and parse
 Entrez.email = "nickp60@gmail.com"
-
+print("reading in gene list")
 genes=open(genelist, "r")
 if genes.name.endswith("txt"):
     genelist_type="txt"
+    print("gene list is a text file")
     #accessions=genes.readlines()
     accessions=[]
     for line in genes:
@@ -65,39 +69,70 @@ if genes.name.endswith("txt"):
             accessions.append(line.rstrip())
 elif genes.name.endswith( "tsv"):  #if the input is tabular, accesions must be in the first column
     genelist_type="delim"
+    print("gene list is a tab-delimited file")
     n=("accession","name","phenotype",	"function","genome",	"note","source")
     genedf= pd.read_csv(genes, sep="\t", names=n, index_col=False)
-    accessions= genedf.iloc[1:, 0].tolist()
+    accessions= genedf.iloc[0:, 0].tolist()
     accessions = [x for x in accessions if str(x) != 'nan']
 elif genes.name.endswith("csv"):
     genelist_type="delim"
+    print("gene list is a comma-deliminated file")
     n=("accession",	"name","phenotype",	"function",	"genome",	"note",	"source")
-    genedf= pd.read_csv(genes, sep=",", names=n)
-    accessions= genedf.iloc[1:, 0].tolist()
+    genedf= pd.read_csv(genes, sep=",")
+    accessions= genedf.iloc[0:, 0].tolist()
     accessions = [x for x in accessions if str(x) != 'nan']
 else:
-    print("REading error")
+    print("Reading error")
 #%% Grab sequences from NCBI, write out resulting fasta file
+print("\n\nFetching %i accessions from NCBI" %len(accessions))
 sequence_handle= Entrez.efetch(db="nucleotide", id=accessions, rettype="fasta")
 seqs=SeqIO.parse(sequence_handle, "fasta")
 with open(str(output+"sequences.fa"), "w") as fasta_output: 
     SeqIO.write(seqs, fasta_output, "fasta")
-
-
+#%%
+sequences_fasta=open(str(output+"sequences.fa"), "r")    
+entrez_results = list(SeqIO.parse(sequences_fasta, "fasta"))
+print("returned %i accessions from ncbi" %len(entrez_results))
+if(len(accessions)!= len(entrez_results)):
+    print("Warning! not all accessions were found!")
+sequences_fasta.close()
 #%% Blast query against target
+def run_blastn():
+    # build commandline call
+    global output_path_tab
+    global output_path_csv
+    output_path_tab=str(output+"dcmegablast_results.tab")
+    output_path_csv=str(output+"dcmegablast_results.csv")
+    blast_cline = NcbiblastnCommandline(query=fasta_output.name, 
+                                        db= blastdb,  evalue=10,
+                                        outfmt=7, out=output_path_tab)
+    add_params=" -num_threads 4 -max_target_seqs 2000 -task dc-megablast"
+    blast_command=str(str(blast_cline)+add_params)
+    print("Running blastn search...")
+    subprocess.Popen(blast_command, stdout=subprocess.PIPE,  shell=True).stdout.read()
 
-# build commandline call
-output_path_tab=str(output+"dcmegablast_results.tab")
-output_path_csv=str(output+"dcmegablast_results.csv")
-blast_cline = NcbiblastnCommandline(query=fasta_output.name, 
-                                    db= blastdb,  evalue=10,
-                                    outfmt=7, out=output_path_tab)
-#%% last I checked, I couldnt figure out how to add this through the python blast api                                    
-add_params=" -num_threads 4 -max_target_seqs 2000 -task dc-megablast"
-#print(str(blast_cline)+add_params)
-blast_command=str(str(blast_cline)+add_params)
-print("Running BLAST search...")
-subprocess.Popen(blast_command, stdout=subprocess.PIPE,  shell=True).stdout.read()
+def run_tblastx():
+    # build commandline call
+    global output_path_tab
+    global output_path_csv
+    output_path_tab=str(output+"tblastx_results.tab")
+    output_path_csv=str(output+"tblastx_results.csv")
+    blast_cline = NcbitblastxCommandline(query=fasta_output.name, 
+                                        db= blastdb,  evalue=10,
+                                        outfmt=7, out=output_path_tab)
+    add_params=" -num_threads 4 -max_target_seqs 2000 -query_gencode 11 -db_gencode 11"
+    blast_command=str(str(blast_cline)+add_params)
+    print("Running tblastx search...")
+    subprocess.Popen(blast_command, stdout=subprocess.PIPE,  shell=True).stdout.read()
+
+#%% Execute
+if blasttype=="blastn":
+    run_blastn()
+elif blasttype=="tblastx":
+    run_tblastx()
+else:
+    print("you need to use either blastn or tblastx, sorry!")
+    
 
 #%% parse output
 colnames=["query_id", "subject_id", "identity_perc", "alignment_length", "mismatches", "gap_opens", "q_start", "q_end", "s_start", "s_end", "evalue", "bit_score"]
