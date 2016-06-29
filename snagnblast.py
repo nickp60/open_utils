@@ -1,9 +1,9 @@
 #!/usr/bin/env python
 """
-version 0.4
+version 0.5
 Minor version changes:
- - implemented tblastx
- - fixed csv header issues
+ - fixed off by one
+ -redid output naming
  
  Quick and dirty script to fetch genes from NCBI when given a file cintaining NCBI accession numbers, 
  blast them against a local database (from makeblastdb), and write out the results as a csv.
@@ -14,7 +14,7 @@ USAGE:
 import os
 #import sys
 #import re
-#import datetime
+import datetime
 import subprocess
 import argparse
 from Bio import SeqIO,Entrez
@@ -26,7 +26,7 @@ import pandas as pd
 #from Bio.Blast import NCBIXML
 from Bio.Blast.Applications import NcbiblastnCommandline
 from Bio.Blast.Applications import NcbitblastxCommandline
-DEBUG=True
+DEBUG=False
 
 
 #%% 
@@ -51,9 +51,10 @@ else:
 
     genelist = args.genelist
     blastdb = args.blastdb
-    blasttype=args.blasttype
+    blasttype=args.blast_type
     output   = args.output
     score_min = args.score_min
+date=str(datetime.datetime.now().strftime('%Y%m%d'))
 #%%  open accessions file, determine type, and parse
 Entrez.email = "nickp60@gmail.com"
 print("reading in gene list")
@@ -87,10 +88,10 @@ else:
 print("\n\nFetching %i accessions from NCBI" %len(accessions))
 sequence_handle= Entrez.efetch(db="nucleotide", id=accessions, rettype="fasta")
 seqs=SeqIO.parse(sequence_handle, "fasta")
-with open(str(output+"sequences.fa"), "w") as fasta_output: 
+with open(str(os.path.join(output, date)+"_sequences.fa"), "w") as fasta_output: 
     SeqIO.write(seqs, fasta_output, "fasta")
 #%%
-sequences_fasta=open(str(output+"sequences.fa"), "r")    
+sequences_fasta=open(str(os.path.join(output, date)+"_sequences.fa"), "r")    
 entrez_results = list(SeqIO.parse(sequences_fasta, "fasta"))
 print("returned %i accessions from ncbi" %len(entrez_results))
 if(len(accessions)!= len(entrez_results)):
@@ -99,10 +100,7 @@ sequences_fasta.close()
 #%% Blast query against target
 def run_blastn():
     # build commandline call
-    global output_path_tab
-    global output_path_csv
-    output_path_tab=str(output+"dcmegablast_results.tab")
-    output_path_csv=str(output+"dcmegablast_results.csv")
+    output_path_tab=str(os.path.join(output, date)+"_dcmegablast_results.tab")
     blast_cline = NcbiblastnCommandline(query=fasta_output.name, 
                                         db= blastdb,  evalue=10,
                                         outfmt=7, out=output_path_tab)
@@ -110,37 +108,38 @@ def run_blastn():
     blast_command=str(str(blast_cline)+add_params)
     print("Running blastn search...")
     subprocess.Popen(blast_command, stdout=subprocess.PIPE,  shell=True).stdout.read()
+    return(output_path_tab)
 
 def run_tblastx():
     # build commandline call
-    global output_path_tab
-    global output_path_csv
-    output_path_tab=str(output+"tblastx_results.tab")
-    output_path_csv=str(output+"tblastx_results.csv")
+    output_path_tab=str(os.path.join(output, date)+"_tblastx_results.tab")
     blast_cline = NcbitblastxCommandline(query=fasta_output.name, 
                                         db= blastdb,  evalue=10,
                                         outfmt=7, out=output_path_tab)
-    add_params=" -num_threads 4 -max_target_seqs 2000 -query_gencode 11 -db_gencode 11"
+    add_params=" -num_threads 2 -max_target_seqs 2000  -query_gencode 11 -db_gencode 11"
     blast_command=str(str(blast_cline)+add_params)
     print("Running tblastx search...")
     subprocess.Popen(blast_command, stdout=subprocess.PIPE,  shell=True).stdout.read()
+    return(output_path_tab)
 
 #%% Execute
 if blasttype=="blastn":
-    run_blastn()
+    output_path_tab = run_blastn()
 elif blasttype=="tblastx":
-    run_tblastx()
+    output_path_tab = run_tblastx()
 else:
     print("you need to use either blastn or tblastx, sorry!")
     
 
 #%% parse output
+print("cleaning up the csv output")
 colnames=["query_id", "subject_id", "identity_perc", "alignment_length", "mismatches", "gap_opens", "q_start", "q_end", "s_start", "s_end", "evalue", "bit_score"]
 csv_results=pd.read_csv(open(output_path_tab), comment="#", sep="\t" , names=colnames)
 #This regex will probably break things rather badly before too long...
 # it looks for capital letter and numbers, dot, number, ie SHH11555JJ8.99 
-csv_results["accession"]=csv_results.query_id.str.extract('(?P<accession>[A-Z \d]*\.\d*)') 
+csv_results["accession"]=csv_results.query_id.str.extract('(?P<accession>[A-Z _\d]*\.\d*)') 
 #%% write out results with new headers or with new headers and merged metadat from accessions.tab
+output_path_csv = str(os.path.splitext(output_path_tab)[0]+".csv")
 if genelist_type=="delim":
     results_annotated=pd.merge(csv_results, genedf, how="left",  on="accession" )
     results_annotated.to_csv(open(output_path_csv, "w") )
