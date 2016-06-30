@@ -107,7 +107,8 @@ def run_blastn():
     add_params=" -num_threads 4 -max_target_seqs 2000 -task dc-megablast"
     blast_command=str(str(blast_cline)+add_params)
     print("Running blastn search...")
-    subprocess.Popen(blast_command, stdout=subprocess.PIPE,  shell=True).stdout.read()
+#    subprocess.Popen(blast_command, stdout=subprocess.PIPE,  shell=True).stdout.read()
+    subprocess.call(blast_command, shell=True)
     return(output_path_tab)
 
 def run_tblastx():
@@ -116,10 +117,11 @@ def run_tblastx():
     blast_cline = NcbitblastxCommandline(query=fasta_output.name, 
                                         db= blastdb,  evalue=10,
                                         outfmt=7, out=output_path_tab)
-    add_params=" -num_threads 2 -max_target_seqs 2000  -query_gencode 11 -db_gencode 11"
+    add_params=" -num_threads 4 -max_target_seqs 2000  -query_gencode 11 -db_gencode 11"
     blast_command=str(str(blast_cline)+add_params)
     print("Running tblastx search...")
-    subprocess.Popen(blast_command, stdout=subprocess.PIPE,  shell=True).stdout.read()
+#    subprocess.Popen(blast_command, stdout=subprocess.PIPE,  shell=True).stdout.read()
+    subprocess.call(blast_command, shell=True)
     return(output_path_tab)
 
 #%% Execute
