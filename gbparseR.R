@@ -6,11 +6,11 @@ DEBUG<-F
 #
 #                         by Nick Waters
 #                           20160325
-this_version<-             "Version 0.4.5"
+this_version<-             "Version 0.4.7"
 ################################################################################
 ################################################################################
 
-help='   Usage: $ Rscript gbparseR.R input.gb  output_path *upstream_ and_downstream_bps
+help='   Usage: $ Rscript gbparseR.R -i input.gb -o output_path* -u upstream_and_downstream_bps*
 #                                                     *optional
 # Major update
 # -made steps to deal with the joined/order loci.  the first step was to add a few lines to the split_if
@@ -18,11 +18,8 @@ help='   Usage: $ Rscript gbparseR.R input.gb  output_path *upstream_ and_downst
 # -also removed empty lines
 #
 # Minor Updates
-# - fixed the fasta output in order to match ncbi standards
-# - next, the get-ranges functions was changed to get start and end of ranges
-
-
-
+  - fixed source.fle bug introduced in 0.4.5 when using NargParse commandline handling
+  - fixed similare output_path bug
 #  known bugs:  need to make support for joined CDSs , ie:
 # "complement(join(332323..2323,223234.2342325.))
 #  -broken gff3 output.  THIS IS THE BIGGEST TODO
@@ -187,6 +184,7 @@ if (is.na(args["o"])){
   working_dir<-paste(cur_dir,"/", gsub("-","",Sys.Date()),"gbparseR","/", sep="")
   if (!dir.exists(working_dir)){dir.create(working_dir)}
   setwd(working_dir)
+  output_path<-working_dir 
 } else {
     output_path<-arg_directory(args['o'], VERBOSE = F)
       setwd(output_path)
@@ -200,9 +198,9 @@ if (is.na(args["u"]) | is.na(as.numeric(args["u"])) | 0>(as.numeric(args["u"])))
 }
 #downstream<-upstream #same upstream as downstream.  need more flexibility? figure it out..
 #  sanity check:
-print(paste("genome source file: ", source.file))
-print(paste("output directory: ", working_dir))
-print(paste("upsteam and downstream region width: ", upstream))
+#print(paste("genome source file: ", source.file))
+#print(paste("output directory: ", working_dir))
+#print(paste("upsteam and downstream region width: ", upstream))
 ################################################################################
 ####  Extract each sequence and write out to files in a new 
 ####  directory
@@ -717,9 +715,10 @@ write.fasta<-function (sequences, names, file.out, open = "w", nbchar = 60,
 ################################################################################
 #  Alrighty now, This is the real start of the fun
 #  UPDATE this, as of 20151208, works with uams-1 genome with 2 sequences.
-
+if(!file.exists(args['i'])){stop("cannot locate your input file!")}
+source.file<-arg_file(args['i']) # lost this line with last update
 split_if_scaffolded(source.file)
-print(paste("Found ",length(grep("scaf.*", dir())),
+ print(paste("Found ",length(grep("scaf.*", dir())),
             " sequence(s) in the current directory: (", getwd(), ")", sep=""))
 print(grep("scaf.+", dir(), value=T))
 
