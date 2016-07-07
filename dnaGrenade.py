@@ -1,13 +1,14 @@
 #!/usr/bin/env python
 """
-version 0.1
+version 0.2
 Minor version changes:
- -
+ - changed skipped message to simple counter
 
 TODO:
 - make work for protein too
 - only works with phred numbers.  is this a good thing?
 Fragments a DNA (multi)fasta file into pseudoreads for assembly help.
+- seeded randomness?  Should this even be a thing?
 
 Input:
 -DNA multifasta (.fasta)
@@ -23,7 +24,7 @@ Output:
 
 USAGE:
  $ python dnaGrenade.py multi.fasta --read_length 250 --depth 10 --seed 27 --output
-          ~/grenade/ --quality
+          ~/grenade/ --quality 38
 """
 import os
 import random
@@ -121,6 +122,7 @@ def main():
                     "_qual_" + str(target_quality) + "_len_" + str(target_read_len) + ".fastq"))
     outfile = open(output_handle, "w")
     counter = 0
+    skipcounter = 0
     for index, rec in enumerate(SeqIO.parse(open(input_seqs_path, "r"), 'fasta')):
         if len(rec.seq) >= minimum_len:  # for debugging
             coordinates = generate_break_coords(len(rec.seq), depth_of_coverage=target_depth,
@@ -132,9 +134,10 @@ def main():
                 SeqIO.write(record, outfile, "fastq")
                 counter = counter + 1
         else:
-            print("skipping %s" % rec.name)
+            skipcounter = skipcounter + 1
     outfile.close()
     print("wrote %i fragments to %s" % (counter, output_handle))
+    print("skipped %i short sequences" % skipcounter)
 
 
 if __name__ == '__main__':
