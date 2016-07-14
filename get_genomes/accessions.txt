@@ -1,0 +1,3 @@
+#some testing accessions for a get_genomes.py
+KR001958.1
+LC075482.1
