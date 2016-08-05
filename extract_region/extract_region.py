@@ -2,9 +2,10 @@
 # -*- coding: utf-8 -*-
 """
 Created on Mon Jul 18 11:44:26 2016
-version 0.2
+version 0.4
 Minor version changes:
- -
+ - fixed bug line 47: if lines[line] == ">" needed to be if lines[line][0] == ">":
+
 
 TODO:
 
@@ -20,10 +21,7 @@ if DEBUG:
     input_seqs_path = "grab.fasta"
     coords = "5:342"
 else:
-    parser = argparse.ArgumentParser(description="This script takes a multifasta and fragments the\
-                                                  entries according to the parameters provided,\
-                                                  outputing the results as a Illumina 1.8+ fastq\
-                                                  file with quality provided.")
+    parser = argparse.ArgumentParser(description="Given a set of coords, extract a region of the genome.")
     parser.add_argument("fasta_file", help="input genome")
     parser.add_argument("coords", help="start:end")
     args = parser.parse_args()
@@ -44,7 +42,7 @@ def main():
     for line in range(1, len(lines)):
         if len(seq) > end:  # only read in up to what you need
             break
-        if lines[line] == ">":
+        if lines[line][0] == ">":
             raise ValueError("only for use with single fastas")
         seq = str(seq + lines[line].strip())
     linewidth = 80  # standard
@@ -60,7 +58,7 @@ def main():
     sys.stdout.write(header)
     sys.stdout.write("\n")
     sys.stdout.write(newstring)
-
+    sys.stdout.write("\n")  # to get rid of '%' at end shown in terminal
 
 if __name__ == '__main__':
     main()
