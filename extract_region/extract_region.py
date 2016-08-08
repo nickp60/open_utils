@@ -57,8 +57,10 @@ def get_chrom_of_interest(chrom, lines):
                     if len(re.search(chrom, line).group(0)) > 0:
                         print("extracting from %s" % chrom)
                         startindex = index
-                except:
+                except AttributeError:
                     continue
+            if index == (maxlines - 1) and startindex is None:
+                raise ValueError("%s not found in any of the fasta headers!" % chrom)
     while endindex is None:
         for nline in range(startindex+1, maxlines):
             if lines[nline][0] == ">" or int(nline) == int(maxlines-1):
