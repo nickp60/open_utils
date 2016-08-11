@@ -23,9 +23,9 @@ if DEBUG:
     input_seqs_path = "multientry.fasta"
     coords = "'NODE_2_length_777_cov_4.02:5:342'"
 else:
-    parser = argparse.ArgumentParser(description="Given a set of coords, extract a region of the genome.")
+    parser = argparse.ArgumentParser(description="Given a set of coords (and an optional chromosome or contig), extract a region of the genome.  It goes to standard out, which can easily be redirected to a file with '>')
     parser.add_argument("fasta_file", help="input genome")
-    parser.add_argument("coords", help="start:end")
+    parser.add_argument("coords", help="start:end or chromosome:start:end")
     args = parser.parse_args()
     input_seqs_path = args.fasta_file
     coords = args.coords
