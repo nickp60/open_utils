@@ -25,17 +25,14 @@ else:
     parser = argparse.ArgumentParser(description="")
     parser.add_argument("fastq", help="input fastq")
     parser.add_argument("query", help="sd")
-    parser.add_argument("-e", "--escape", default="F", help="escape or no")
+    parser.add_argument("-e", "--escape", action='store_true')
     args = parser.parse_args()
     fastq = args.fastq
     query = args.query
     escape = args.escape
 
-if escape in ["T", "t", "true", "True"]:
-    escape = True
+if escape:
     query = re.escape(query)
-else:
-    escape = False
 
 def search_fastq(fastq, query):
     """

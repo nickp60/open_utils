@@ -1,0 +1,166 @@
+LOCUS       KR001958                1983 bp    DNA     linear   BCT 14-JUL-2016
+DEFINITION  Streptobacillus notomytis strain KWG2 GyrB (gyrB) gene, complete
+            cds.
+ACCESSION   KR001958
+VERSION     KR001958.1  GI:910767611
+KEYWORDS    .
+SOURCE      Streptobacillus notomytis
+  ORGANISM  Streptobacillus notomytis
+            Bacteria; Fusobacteria; Fusobacteriales; Leptotrichiaceae;
+            Streptobacillus.
+REFERENCE   1  (bases 1 to 1983)
+  AUTHORS   Eisenberg,T., Nicklas,W., Mauder,N., Rau,J., Contzen,M.,
+            Semmler,T., Hofmann,N., Aledelbi,K. and Ewers,C.
+  TITLE     Phenotypic and Genotypic Characteristics of Members of the Genus
+            Streptobacillus
+  JOURNAL   PLoS ONE 10 (8), E0134312 (2015)
+   PUBMED   26252790
+  REMARK    Publication Status: Online-Only
+REFERENCE   2  (bases 1 to 1983)
+  AUTHORS   Eisenberg,T., Semmler,T. and Ewers,C.
+  TITLE     Direct Submission
+  JOURNAL   Submitted (20-MAR-2015) NG Microbial Genomics, Robert Koch
+            Institute, Nordufer 20, Berlin, Berlin 13353, Germany
+COMMENT     ##Assembly-Data-START##
+            Assembly Method       :: CLC Genomics Workbench v. 7.5
+            Sequencing Technology :: Illumina
+            ##Assembly-Data-END##
+FEATURES             Location/Qualifiers
+     source          1..1983
+                     /organism="Streptobacillus notomytis"
+                     /mol_type="genomic DNA"
+                     /strain="KWG2"
+                     /isolation_source="Rattus rattus, oral swab"
+                     /db_xref="taxon:1712031"
+                     /country="Japan"
+                     /note="originally submitted as Streptobacillus
+                     moniliformis"
+     gene            1..1983
+                     /gene="gyrB"
+     CDS             1..1983
+                     /gene="gyrB"
+                     /note="DNA gyrase subunit GyrB"
+                     /codon_start=1
+                     /transl_table=11
+                     /product="GyrB"
+                     /protein_id="AKU48342.1"
+                     /db_xref="GI:910767612"
+                     /translation="MSEKKYGGESITVLEGLDAVRVRPGMYIGTTSSRGLHHLVWEIV
+                     DNSIDEALAGVCDTITVRMLPDSEIEIIDNGRGIPTEIHKSGKSTLEVVMTVLHAGGK
+                     FDNSNYQFSGGLHGVGISVVNALSERLEATVTRDGKIVRQIFSKGNPITEALEIGKAP
+                     DKEHGTTIKFKPDADIFETIQFDYDILQRRLKELAYLNQGIKIILIDSRKPEKVKEEV
+                     FHFEGGIVDFVTELVGEDKIIEDVIYMKDRVMLTEGEVDDEGNPIPDKYSEVEIAMIY
+                     KNSQSTIEYSFVNNINTSDGGTHVSGLRTALTRTINDLAREASSKNEFKGEDVREGLV
+                     YVLSLKFPEPQFESQTKAKLGSSEATSIVSGVFGSKLKMYLEDHPKDCKIIIDKIAIS
+                     KQAREAAKRARDLVTKKNEFSLGGLPGKLADCQSKNPEESEIFIVEGDSAGGSAKQGR
+                     FKEYQAILPLRGKILNVEKANEHKILENSEIKAMITAFGAGFGDRFDIEKLRYHKIII
+                     MTDADVDGAHIRTLMLTFFYRYLRELINNGHIYIAQPPLYKVTTKSGKKEQVKYAYSD
+                     EQLKSITRVLDEKLGVDNSGKNKYNVQRYKGLGEMNPDQLKETTMDPDVRTLLKVTLE
+                     DAQYADKMFSILMGDKVEPRREFIEEHANYVRNLDI"
+ORIGIN      
+        1 atgtcagaaa aaaaatatgg tggagaaagc attacagtat tagagggatt agatgctgta
+       61 agggttagac caggaatgta catagggaca acttcttcaa gaggattaca tcatttagta
+      121 tgggaaatag tagataatag tatagatgaa gctcttgcag gagtatgtga tactattaca
+      181 gttagaatgc ttccagattc agaaatagaa ataatagata atggtagggg tatacctaca
+      241 gaaattcata aatcaggtaa atcaacactt gaagtagtaa tgacagtact tcatgctgga
+      301 gggaaatttg ataattcaaa ctatcagttt tcaggaggac ttcatggagt cggtatatct
+      361 gtagttaatg ctttatctga aagattagag gcaacagtta ctagagatgg taaaatcgtt
+      421 agacaaatat tttcaaaagg gaatccaatt acagaagctt tagaaatagg taaagctcca
+      481 gataaggaac atggaactac aattaaattt aaaccagatg cagatatatt tgagactata
+      541 caatttgatt atgatattct tcaaagaaga cttaaagaac ttgcatattt aaatcagggt
+      601 ataaaaataa tattaataga ttcaagaaaa ccagaaaaag ttaaggaaga agtatttcac
+      661 tttgaaggtg gaatagttga ttttgttaca gaacttgtag gagaagataa aatcattgaa
+      721 gatgtaatat atatgaaaga tagggtaatg cttacagaag gtgaagtaga tgatgaggga
+      781 aatcctatac ctgataaata ttcagaggta gagatagcta tgatatataa gaactcacaa
+      841 tctacaatag aatattcttt tgttaataat attaatacat cagatggtgg aacacatgtt
+      901 tctggactta gaacagcttt aactagaact attaatgatt tagctaggga agctagtagt
+      961 aaaaatgaat ttaagggtga ggatgtaaga gaaggtttag tttatgtatt aagtttaaaa
+     1021 ttccctgagc cacagtttga atcacagact aaggctaaac ttggttcatc tgaagcaaca
+     1081 agtatagttt caggggtatt tggaagtaaa cttaagatgt atttagaaga tcatcctaaa
+     1141 gattgtaaaa ttattataga taaaatagct atatctaagc aagcaagaga agcagcgaaa
+     1201 agagcaagag atcttgtaac taagaaaaat gaatttagtt taggtggact tcctggtaaa
+     1261 cttgcagatt gtcaatcaaa aaatccggaa gaatctgaga tatttatagt agagggagat
+     1321 tcagctggtg gttctgcaaa acagggtaga tttaaagaat accaagcaat acttccattg
+     1381 cgtggtaaga tacttaatgt tgagaaagct aatgagcata aaatattaga aaattcagaa
+     1441 atcaaggcta tgattacagc ttttggtgca ggatttggag atagatttga tatagagaag
+     1501 ttaagatatc ataagataat aataatgaca gatgccgatg tagatggagc tcatattaga
+     1561 acacttatgc ttacattctt ctatagatat ctaagagaat tgattaataa tgggcatata
+     1621 tatatagctc aaccaccttt atataaagtt acaactaaga gtgggaaaaa agaacaagtt
+     1681 aaatatgcat attctgatga acaattaaag agtataacta gggtgcttga tgaaaaatta
+     1741 ggtgtagata atagtggaaa aaataaatat aatgttcaaa gatataaagg gcttggagaa
+     1801 atgaatcctg atcaattaaa agaaacaact atggatccag atgttagaac tttattaaaa
+     1861 gttacactag aggatgcaca atatgcagat aaaatgtttt caatattaat gggagataaa
+     1921 gtagaaccaa gaagagaatt tattgaagaa catgcaaatt acgtaagaaa cttagatata
+     1981 tag
+//
+
+LOCUS       LC075482                1600 bp    DNA     linear   BCT 08-OCT-2015
+DEFINITION  Staphylococcus aureus gene for toxic shock syndrome toxin, complete
+            cds, strain: TSST.
+ACCESSION   LC075482
+VERSION     LC075482.1  GI:937574259
+KEYWORDS    .
+SOURCE      Staphylococcus aureus
+  ORGANISM  Staphylococcus aureus
+            Bacteria; Firmicutes; Bacilli; Bacillales; Staphylococcaceae;
+            Staphylococcus.
+REFERENCE   1
+  AUTHORS   Rahimi,F., Pourshafie,M.R. and Pazhouhnia,S.
+  TITLE     Molecular characterization of methicillin resistant Staphylococcus
+            aureus strains isolated from hospitals in Tehran, Iran
+  JOURNAL   Unpublished
+REFERENCE   2  (bases 1 to 1600)
+  AUTHORS   Rahimi,F., Pourshafie,M.R. and Pazhouhnia,S.
+  TITLE     Direct Submission
+  JOURNAL   Submitted (18-AUG-2015) Contact:Setareh Pazhouhnia University of
+            Isfahan, Biology; Hezar-Jreeb street, Isfahan, Isfahan 81746-73441,
+            Iran
+FEATURES             Location/Qualifiers
+     source          1..1600
+                     /organism="Staphylococcus aureus"
+                     /mol_type="genomic DNA"
+                     /strain="TSST"
+                     /isolation_source="human blood"
+                     /host="Homo sapiens"
+                     /db_xref="taxon:1280"
+                     /country="Iran"
+     CDS             557..868
+                     /note="Staphylococcal/Streptococcal toxin, OB-fold domain"
+                     /codon_start=1
+                     /transl_table=11
+                     /product="toxic shock syndrome toxin"
+                     /protein_id="BAS69587.1"
+                     /db_xref="GI:937574260"
+                     /translation="MGWEASSERMYPEDGALKGEINLMQHSLIIFPSHYYSPAFTKGE
+                     KVDLNTKRTKKSQHTSEGTYIHFQISGVTNTEKLPTPIELPLKVKVHGKDSPLNMAKV
+                     R"
+ORIGIN      
+        1 ttcctaggag ttgtttaaat aaatggatat ctcggttgat aagtatggag tttacgcttc
+       61 ctatggaaat atggtaaaaa aggtaccagc tcggctggct ccgctgctgg ttctggcact
+      121 agtgtgagca agggcgaaga agataacatg gctatcatta aagaagttca tgcgcttcaa
+      181 agttcacatg gagggttctg ttaacggtca cgagttcgag atcgaaggcn aaggcgaggg
+      241 ccgtccgtat gaaggcaccc agaccgccaa actgaaagtg actaaaggcg gcccgctgcc
+      301 ttttgcgtgg gacatcctga gcccgcaatt tatgtacggt tctaaagctt atgttaaaca
+      361 cccagcggat atcccggact atctgaagct gtcttttccg gaaggttttc aagtgggaac
+      421 gcgtaatgaa ttttgaagat ggtggtgtcg tgaccgtcac tcaggactcc tccctgcagg
+      481 atggcgagtt catctataaa gttaaactgc gtggtactaa ttttccatct gatggcccgg
+      541 tgatgcagaa gaagagatgg gttgggaggc gtctagcgaa cgcatgtatc cggaagatgg
+      601 tgcgctgaaa ggcgaaatta atctgatgca gcatagcttg ataatttttc cgagtcatta
+      661 ttatagccct gcttttacaa aaggggaaaa agttgactta aacacaaaaa gaactaaaaa
+      721 aagccaacat actagcgaag gaacttatat ccatttccaa ataagtggcg ttacaaatac
+      781 tgaaaaatta cctactccaa tagaactacc tttaaaagtt aaggttcatg gtaaagatag
+      841 ccccttaaat atggccaaag ttcgataaaa aacaattagc tatatcaact ttagactttg
+      901 aaattcgtca tcagctaact caaatacatg gattatatcg ttcaagcgat aaaacgggtg
+      961 gttattggaa aacaatgttt aatttcgcct ttcagcggac catcttccgg atacatgcgt
+     1021 tcactagacg cctcccaacc catcgtcttc ttctgcatca ccgggccatc agatggaaaa
+     1081 ttattaccaa gcattttaac tttttaaatc aactcgccat cctgcaggga ggagtcctga
+     1141 gtgacggtca caacaccacc atcttcaaaa ttcattacgc gttcccactt gaaaccttcc
+     1201 ggaaaagaca gcttcctata gtccgggata tccgctgggt gtttaacata agctttgaac
+     1261 cgtacataaa ttgcgggctc aagatgtcac acgcaaaagg cagcgggccg cctttagtca
+     1321 ctttcagttt ggcggtctgg gtgccttcat acggactgtc ctcgctaccg ccttcgatct
+     1381 gaaatagtga tcgataacag aaccctccgt gtgaactttg aagcgcatga actctttaga
+     1441 tgataccatg ttatctttct tcgcccttgc tcccactagt gccagaatca gcaggcggag
+     1501 ccagccgagc tcgtaccttt tttaccataa ttgtccgtac gaagcgtaga ctccatactt
+     1561 atcaacagag atattccaat ttatttcaaa caacttctag
+//
+

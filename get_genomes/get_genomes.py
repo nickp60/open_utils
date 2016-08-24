@@ -1,35 +1,57 @@
 #!/usr/bin/env python
 """
 version 0.5
-minor revisions:
- - added genbank option
- - reversed single vs grouped naming convention just to confuse people
- - probably ruined whatever good thing this had going by overcomplicating it.
-"""
 
+#TODO:
+minor revisions:
+ - FTP and argparse
+"""
+import argparse
 from Bio import Entrez
 import sys
 import os
 import time
+import subprocess
 ## dd/mm/yyyy format
 datetimetag = time.strftime("%Y%m%d%I%M%S")
 #
-Entrez.email = "AlfredTheDaring@gmail.com"
 
 
-def usage():
-    print('\nA script to fetch nucleotide sequences from NCBI when given a file containing NCBI accession numbers\n')
-    print('Usage: python gen_genomes.py text_file_with_accessions.txt /output/directory/ multiple_or_single fasta_or_gb')
-    print('("single" will return single file; "multiple" returns  individually)')
-    print('(if using "gb", will return genbank results as well)')
-    sys.exit()
-
-
-def get_args():
-    if len(sys.argv) != 5 or (sys.argv[3] != 'multiple' and sys.argv[3] != 'single') or (sys.argv[4] != 'fasta' and sys.argv[4] != 'gb'):
-        usage()
+def get_args(DEBUG=False):
+    dummy_args = argparse.Namespace(inputlist="accessions.txt",  # "batch or single
+                                    outputdir=os.getcwd(),
+                                    outfmt='fasta',
+                                    email="Joe@salad.edu",
+                                    concat=True)
+    if DEBUG:  # ie, if running interactively
+        print("Using Dummy Arguments")
+        return(dummy_args)
+    parser = argparse.ArgumentParser(
+        description=str("A script to fetch nucleotide sequences " +
+                        "from NCBI when given a file containing " +
+                        "NCBI accession numbers."))
+    parser.add_argument("inputlist", action="store", type=str, default="accessions.txt",
+                        help="file containing list of accessions or " +
+                        "ftp addresses; default: %(default)s")
+    parser.add_argument("-o", "--outputdir", action="store", dest="outputdir",
+                        help="where to put the output; default: %(default)s",
+                        default=os.getcwd(), type=str)
+    parser.add_argument("-f", "--outfmt", action="store", dest="outfmt",
+                        help="fasta or gb; default: %(default)s",
+                        default='fasta', type=str)
+    parser.add_argument("-e", "--email", action="store", dest="email",
+                        help="email address",
+                        default='joe_smith@mail.gov', type=str)
+    parser.add_argument("--concat", action="store_true", dest="concat", default=False,
+                        help="output as single file; default: %(default)s")
+    parser.add_argument("--DEBUG", action="store_true", dest="DEBUG", default=False,
+                        help="DEBUG mode for testing; default: %(default)s")
+    args = parser.parse_args()
+    if args.DEBUG:  # ie, if running debug from cline
+        print("Using Dummy Arguments")
+        return(dummy_args)
     else:
-        return sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4]
+        return(args)
 
 
 def parse_accession_list(pathtofile):
@@ -41,64 +63,75 @@ def parse_accession_list(pathtofile):
     return(accessions)
 
 
-def fetch_and_write_seqs(accessions, destination, outtype):
-    if (outtype == 'single'):
+def fetch_and_write_seqs(accessions, destination, outfmt='fasta', concat=False):
+    """
+    now should be able to detect and handle ftp calls to NCBI only
+    takes an accession list
+    if first item listed is an ftp address, it will run FTP calls for all the
+    rest of the items. if not, the files will be fetched from entrex and if
+    concat, smooshed into one file. Returns 0 if succesful
+    """
+    if outfmt == 'fasta':
+        ftpsuf = "_genomic.fna.gz"  # ftp suffix
+        rettype = 'fasta'
+    elif outfmt == "gb":
+        ftpsuf = "_genomic.gbff.gz"  # ftp suffix
+        rettype = "gbwithparts"
+    else:
+        print("only supports fasta and gb")
+    if accessions[0].startswith("ftp://"):
+        if concat:
+            raise ValueError(str("FTP input can only output individual files for" +
+                                 "now; turn off --concat flag"))
+        ftpcmds = []
         for i in accessions:
-            print("fetching %s" % i)
-            out_handle = open(str(destination.strip()+datetimetag+"get_genomes_result.fasta"), "a")
-            sequence_handle = Entrez.efetch(db="nucleotide", id=i, rettype="fasta", retmode="text")
-            for line in sequence_handle:
-                out_handle.write(line)
-            out_handle.close()
-            sequence_handle.close()
-    elif (outtype == 'multiple'):
+            filebasename = str(i.split('/')[-1] + ftpsuf)
+            fastapath = str(i + "/" + filebasename)
+            cmd = "wget %s -O %s" % (fastapath,
+                                     os.path.join(destination, filebasename))
+            ftpcmds.append(cmd)
+        try:
+            for j in ftpcmds:
+                print("Fetching item %i of %i" % (ftpcmds.index(j) + 1,
+                                                  len(ftpcmds)))
+                subprocess.call(j, shell=sys.platform != "Win32")
+            return(0)
+        except:
+            print("Somethings gone sour")
+            sys.exit(1)
+    if concat:
         for i in accessions:
-            print("fetching %s" % i)
-            out_handle = open(str(destination.strip() + i + ".fasta"), "w")
-            sequence_handle = Entrez.efetch(db="nucleotide", id=i, rettype="fasta", retmode="text")
+            print("fetching %s as genomic %s" % (i, outfmt))
+            out_handle = open(str(destination.strip() + datetimetag +
+                                  "get_genomes_result." + outfmt), "a")
+            sequence_handle = Entrez.efetch(db="nucleotide", id=i, rettype=rettype, retmode="text")
             for line in sequence_handle:
                 out_handle.write(line)
             out_handle.close()
             sequence_handle.close()
     else:
-        raise ValueError("Check your third argument! It must be either 'multiple' or 'single'")
-    return(out_handle.name)
-
-
-def fetch_and_write_gb(accessions, destination, outtype):
-    if (outtype == 'single'):
         for i in accessions:
-            print("fetching %s" % i)
-            out_handle = open(str(destination.strip()+datetimetag+"get_genomes_result.gb"), "a")
-            sequence_handle = Entrez.efetch(db="nucleotide", id=i, rettype="gbwithparts",
-                                            retmode="text")
+            print("fetching %s as genomic fasta" % i)
+            out_handle = open(str(destination.strip() + i + "." + outfmt), "w")
+            sequence_handle = Entrez.efetch(db="nucleotide", id=i, rettype=rettype, retmode="text")
             for line in sequence_handle:
                 out_handle.write(line)
             out_handle.close()
             sequence_handle.close()
-    elif (outtype == 'multiple'):
-        for i in accessions:
-            print("fetching %s" % i)
-            out_handle = open(str(destination.strip() + i + ".gb"), "w")
-            sequence_handle = Entrez.efetch(db="nucleotide", id=i, rettype="gbwithparts",
-                                            retmode="text")
-            for line in sequence_handle:
-                out_handle.write(line)
-            out_handle.close()
-            sequence_handle.close()
-    else:
-        raise ValueError("Check your third argument! It must be either 'multiple' or 'single'")
-    return(out_handle.name)
+    return(0)
 
 
+#%%
 ##########################################################################
 
 if __name__ == '__main__':
-    inputlist, outputdirectory, outtype, outfmt = get_args()
-    if not os.path.isdir(outputdirectory):
-        print("creating %s" % outputdirectory)
-        os.mkdir(outputdirectory)
-    accession_list = parse_accession_list(inputlist)
-    outputpath = fetch_and_write_seqs(accession_list, outputdirectory, outtype)
-    if outfmt == "gb":
-            outputpath2 = fetch_and_write_gb(accession_list, outputdirectory, outtype)
+    args = get_args()
+    Entrez.email = args.email
+    output_dir_path = os.path.join(args.outputdir, "")
+    if not os.path.isdir(output_dir_path):
+        print("creating %s" % output_dir_path)
+        os.mkdir(output_dir_path)
+    accession_list = parse_accession_list(args.inputlist)
+    outputpath = fetch_and_write_seqs(accession_list,  output_dir_path,
+                                      outfmt=args.outfmt, concat=args.concat)
+    print("Outputting results to %s" % (output_dir_path))
