@@ -32,8 +32,8 @@ print_alignment<-function(subject, pattern, breakp=60){
     x <- y
     pattern<-reverseComplement(pattern)
   }
-  if (score(x) < (.5*nchar(pattern))){
-    print("No match found with a score above half the length of the pattern")
+  if (score(x) < (.1*nchar(pattern))){
+    print("No match found with a score above 1/10th the length of the pattern")
     return(1)
   } else{
     print(score(x))
@@ -77,5 +77,5 @@ for (i in 1:length(subject)){
   print(names(subject[i]))
   print_alignment(subject=subject[i], pattern=pattern, breakp = 80)
 }
-# 
+#
 

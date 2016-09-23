@@ -30,9 +30,15 @@ def get_args(DEBUG=False):
         description=str("A script to fetch nucleotide sequences " +
                         "from NCBI when given a file containing " +
                         "NCBI accession numbers."))
-    parser.add_argument("inputlist", action="store", type=str, default="accessions.txt",
+    parser.add_argument("-i", "--inputlist", action="store", type=str,
+                        default="accessions.txt",
                         help="file containing list of accessions or " +
                         "ftp addresses; default: %(default)s")
+    parser.add_argument("-q","--quick_fetch", action="store",
+                        dest="quick_fetch", default='',
+                        help="if used, this will just get single accession "+
+                        "provided as argument. Ignores any provided accession"+
+                        " list")
     parser.add_argument("-o", "--outputdir", action="store", dest="outputdir",
                         help="where to put the output; default: %(default)s",
                         default=os.getcwd(), type=str)
@@ -111,7 +117,7 @@ def fetch_and_write_seqs(accessions, destination, outfmt='fasta', concat=False):
             sequence_handle.close()
     else:
         for i in accessions:
-            print("fetching %s as genomic fasta" % i)
+            print("fetching %s as %s" % (i, outfmt))
             out_handle = open(str(destination.strip() + i + "." + outfmt), "w")
             sequence_handle = Entrez.efetch(db="nucleotide", id=i, rettype=rettype, retmode="text")
             for line in sequence_handle:
@@ -131,7 +137,10 @@ if __name__ == '__main__':
     if not os.path.isdir(output_dir_path):
         print("creating %s" % output_dir_path)
         os.mkdir(output_dir_path)
-    accession_list = parse_accession_list(args.inputlist)
+    if args.quick_fetch is not "":
+        accession_list = [args.quick_fetch]
+    else:
+        accession_list = parse_accession_list(args.inputlist)
     outputpath = fetch_and_write_seqs(accession_list,  output_dir_path,
                                       outfmt=args.outfmt, concat=args.concat)
     print("Outputting results to %s" % (output_dir_path))
