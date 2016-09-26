@@ -85,6 +85,7 @@ def fetch_and_write_seqs(accessions, destination, outfmt='fasta', concat=False):
         rettype = "gbwithparts"
     else:
         print("only supports fasta and gb")
+        sys.exit(1)
     if accessions[0].startswith("ftp://"):
         if concat:
             raise ValueError(str("FTP input can only output individual files for" +
