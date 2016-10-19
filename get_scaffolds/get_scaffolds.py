@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 """
-version 0.5
+version 0.1
 
 #TODO:
 minor revisions:
@@ -17,24 +17,33 @@ datetimetag = time.strftime("%Y%m%d%I%M%S")
 #
 
 
-def get_args(DEBUG=False):
-    dummy_args = argparse.Namespace(inputlist="accessions.txt",  # "batch or single
-                                    outputdir=os.getcwd(),
-                                    outfmt='fasta',
-                                    email="Joe@salad.edu",
-                                    concat=True)
-    if DEBUG:  # ie, if running interactively
-        print("Using Dummy Arguments")
-        return(dummy_args)
+def get_args():
+    # dummy_args = argparse.Namespace(inputlist="accessions.txt",  # "batch or single
+    #                                 outputdir=os.getcwd(),
+    #                                 outfmt='fasta',
+    #                                 email="Joe@salad.edu",
+    #                                 concat=True)
+    # if DEBUG:  # ie, if running interactively
+    #     print("Using Dummy Arguments")
+    #     return(dummy_args)
     parser = argparse.ArgumentParser(
         description=str("A script to fetch nucleotide sequences " +
                         "from NCBI when given a file containing " +
                         "NCBI accession numbers."))
-    parser.add_argument("-i", "--inputlist", action="store", type=str,
-                        default="accessions.txt",
+    parser.add_argument("-p", "--input_prefix", action="store", type=str,
+                        default="",dest="input_prefix",
                         help="file containing list of accessions or " +
                         "ftp addresses; default: %(default)s")
-    parser.add_argument("-q","--quick_fetch", action="store",
+    parser.add_argument("-e", "--input_ext", action="store", type=str,
+                        default="",dest="input_prefix",
+                        help="file containing list of accessions or " +
+                        "ftp addresses; default: %(default)s")
+    parser.add_argument("-f","--first", action="store",
+                        dest="quick_fetch", default='',
+                        help="if used, this will just get single accession "+
+                        "provided as argument. Ignores any provided accession"+
+                        " list")
+    parser.add_argument("-l","--last", action="store",
                         dest="quick_fetch", default='',
                         help="if used, this will just get single accession "+
                         "provided as argument. Ignores any provided accession"+
@@ -45,31 +54,19 @@ def get_args(DEBUG=False):
     parser.add_argument("-f", "--outfmt", action="store", dest="outfmt",
                         help="fasta or gb; default: %(default)s",
                         default='fasta', type=str)
-    parser.add_argument("-e", "--email", action="store", dest="email",
-                        help="email address",
-                        default='joe_smith@mail.gov', type=str)
-    parser.add_argument("--concat", action="store_true", dest="concat", default=False,
-                        help="output as single file; default: %(default)s")
-    parser.add_argument("--DEBUG", action="store_true", dest="DEBUG", default=False,
-                        help="DEBUG mode for testing; default: %(default)s")
+    # parser.add_argument("-e", "--email", action="store", dest="email",
+    #                     help="email address",
+    #                     default='joe_smith@mail.gov', type=str)
+    # parser.add_argument("--concat", action="store_true", dest="concat", default=False,
+    #                     help="output as single file; default: %(default)s")
+    # parser.add_argument("--DEBUG", action="store_true", dest="DEBUG", default=False,
+    #                     help="DEBUG mode for testing; default: %(default)s")
     args = parser.parse_args()
-    if args.DEBUG:  # ie, if running debug from cline
-        print("Using Dummy Arguments")
-        return(dummy_args)
-    else:
-        return(args)
+    return(args)
 
 
-def parse_accession_list(pathtofile):
-    accessions = []
-    for line in open(pathtofile):
-        li = line.strip()
-        if not li.startswith("#"):
-            accessions.append(line.split("#")[0].strip()) # allow for comments
-    return(accessions)
-
-
-def fetch_and_write_seqs(accessions, destination, outfmt='fasta', concat=False):
+def fetch_and_write_seqs(accessions, destination, outfmt='fasta',
+                         concat=False):
     """
     now should be able to detect and handle ftp calls to NCBI only
     takes an accession list
@@ -132,6 +129,8 @@ def fetch_and_write_seqs(accessions, destination, outfmt='fasta', concat=False):
 ##########################################################################
 
 if __name__ == '__main__':
+    print("this doesnt work yet")
+    sys.exit(1)
     args = get_args()
     Entrez.email = args.email
     output_dir_path = os.path.join(args.outputdir, "")
