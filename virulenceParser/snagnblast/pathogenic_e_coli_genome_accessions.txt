@@ -1,0 +1,19 @@
+#if using multiple sequences(ie, strains with plasmids), they will be renamed after first sequence
+#K12 Lab Strain
+NC_000913.3
+#UPEC UMN026 and plasmids
+NC_011751.1
+NC_011749.1
+NC_011739.1
+#UPEC IAI39
+NC_011750.1
+#O157:H7 and plasmids
+NC_002695.1
+#O83:H1 str. NRG 857C
+NC_017634.1
+NC_017659.1
+#HUS O104:H4 str. 2011C-3493
+NC_018658.1
+NC_018659.1
+NC_018666.1
+NC_018660.1

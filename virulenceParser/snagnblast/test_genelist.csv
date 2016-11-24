@@ -1,0 +1,10 @@
+accession,name,phenotype,function,genome,note,source
+AB012102.1,stx1,STEC,,,,law D 2002
+AB030484.1,stx2,STEC,,,,law D 2003
+KJ549689.1,EspA,A/E,LEE,,,law D 2004
+AF254457.1,EspB,A/E,LEE,,,law D 2005
+U69128.1,EspC,,,,,law D 2006
+Y09228.1,EspD,A/E,LEE,,,law D 2007
+EU878777.1,EspP,,protease,,,law D 2008
+M58154.1,eae,,Intimin; intimate attachment,,,
+AF125993.1,tir,,translocated intimin receptor,,,law D 2010
