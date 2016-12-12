@@ -155,6 +155,37 @@ def get_matches(seq_list, fwd, rev, expected_size, partial=False, strand="+", lo
                 pass
     return(matches)
 
+def interpret_hits(arpA, chu, TspE4, yjaA):
+    if arpA:
+        if chu:
+            # either D or E
+            if TspE4 and yjaA:
+                result = "U"
+            elif not TspE4 and not yjaA:
+                result = "B1/E"
+            elif TspE4:
+                result = "B1/E"
+            else:
+                assert yjaA, "error interpretting results!"
+                result = "E/Cryptic"
+        else:
+            if TspE4 and yjaA:
+                result = "U"
+            elif not TspE4 and not yjaA:
+                result = "A"
+            elif TspE4:
+                result = "B1"
+            elif yjaA:
+                result = "A/C"
+    else:
+        if not chu:
+            result = "cryptic"
+        else:
+            if yjaA or TspE4:
+                result = "B1"
+            else:
+                result = "F"
+    return(result)
 
 def main():
     args = get_args()
@@ -174,7 +205,7 @@ def main():
     quad_primers = {"chu": [chuA_1b, chuA_2, 288],
                     "yjaA": [yjaA_1b, yjaA_2b, 211],
                     "TspE4": [TspE4_C2, TspE4C2_2b, 152],
-                    "AceK": [AceK_f, ArpA1_r, 400]}
+                    "arpA": [AceK_f, ArpA1_r, 400]}
 
     controls = [trpBA_f, trpBA_r]
     logger = logging.getLogger('root')
@@ -220,8 +251,16 @@ def main():
 
         if len(fwd_matches) or len(rev_matches) != 0:
             print("%s: +" % key)
+            val.append(True)
         else:
             print("%s: -" % key)
+            val.append(False)
+    Clermont_type = interpret_hits(arpA=quad_primers['arpA'][3],
+                   chu=quad_primers['chu'][3],
+                   TspE4=quad_primers['TspE4'][3],
+                   yjaA=quad_primers['yjaA'][3])
+    print("Clermont type: %s" % Clermont_type)
+
 
 
 if __name__ == "__main__":
