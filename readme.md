@@ -15,7 +15,7 @@ convert 16s metagenomic output from illumina to a format that mimicks metaphlan 
 given a genbank genome of interest and a .faa for reference, this performs reciprocal blasting to "reannote" and provide othology information
 
 ### snagnblast
-given a list of gene accesions, this retrieves them and blasts against a local BLAST database using either blastn or tblastx. Snagnblast multi is for use with multiple processors, but still needs a bit of a tuneup to pool jobs instead of queueing.
+given a list of gene accesions, this retrieves them and blasts against a local BLAST database using either blastn or tblastx.
 
 ### get_genomes
 given a list of genome accessions, this retrieves them from NCBI and writes out a fna file
@@ -23,3 +23,5 @@ given a list of genome accessions, this retrieves them from NCBI and writes out 
 ### dnaGrenade
 generates pseudoreads from a fasta file of loci of interest
 
+### clermontPCR
+This is a simple search tool to check for the presence/absence of genes used as part of the 2013 Clermont Phylotyping scheme.
