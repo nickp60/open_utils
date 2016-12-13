@@ -4,6 +4,7 @@ import re
 import argparse
 import sys
 import Bio
+import unittest
 import itertools
 import logging
 
@@ -88,33 +89,38 @@ def get_args():  # pragma: no cover
     return args
 
 
-def get_matches(seq_list, fwd, rev, expected_size, partial=False, strand="+", logger=None):
+def get_matches(seq_list, fwd_primer, rev_primer, expected_size, partial=False, strand="+", logger=None):
     """given a seqence list  and regex compilations of your primers
     return the matches
     """
-    assert logger is not None, "must use logger!"
+    # assert logger is not None, "must use logger!"
     assert strand in ["-", "+"], "strand must be either + or -"
-    if strand == "-":
-        seqs = [x.reverse_complement() for x in seq_list]
+    assert isinstance(seq_list[0], SeqRecord), "must submit list of SeqRecords"
+    if strand == "+":
+        fwd = re.compile(fwd_primer, re.IGNORECASE)
+        rev = re.compile(str(SeqRecord(Seq(rev_primer).reverse_complement()).seq),
+                         re.IGNORECASE)
     else:
-        seqs = seq_list
+        fwd = re.compile(rev_primer, re.IGNORECASE)
+        rev = re.compile(str(SeqRecord(Seq(fwd_primer).reverse_complement()).seq),
+                         re.IGNORECASE)
     matches = []
-    for i in seqs:
+    for i in seq_list:
         coords_F = None
         coords_R = None
         try:
             coords_F = fwd.search(str(i.seq)).span()
-            logger.info("F match!")
+            print("F match!")
         except:
             pass
         try:
             coords_R = rev.search(str(i.seq)).span()
-            logger.info("R match!")
+            print("R match!")
         except:
             pass
 
         if coords_F is not None and coords_R is not None:
-            logger.info("Match found on %s (%s)" % (i.id, strand))
+            print("Match found on %s (%s)" % (i.id, strand))
             matches.append(PcrHit(
                 template_orientation=strand,
                 template_id=i.id,
@@ -124,9 +130,9 @@ def get_matches(seq_list, fwd, rev, expected_size, partial=False, strand="+", lo
                 R_end=coords_R[1],
                 partial=partial
             ))
-        elif coords_F is not None and coords_R is None:
+        elif coords_F is not None:
             if len(i.seq[coords_F[0]:]) > expected_size:
-                logger.info("Possible match on %s (%s)" % (i.id, strand))
+                print("Possible match on %s (%s)" % (i.id, strand))
                 matches.append(PcrHit(
                     template_orientation=strand,
                     template_id=i.id,
@@ -138,9 +144,9 @@ def get_matches(seq_list, fwd, rev, expected_size, partial=False, strand="+", lo
                 ))
             else:
                 pass
-        elif coords_R is not None and coords_F is None:
+        elif coords_R is not None:
             if not coords_R[0] < expected_size:
-                logger.info("Possible match on %s (%s)" % (i.id, strand))
+                print("Possible match on %s (%s)" % (i.id, strand))
                 matches.append(PcrHit(
                     template_orientation=strand,
                     template_id=i.id,
@@ -151,9 +157,11 @@ def get_matches(seq_list, fwd, rev, expected_size, partial=False, strand="+", lo
                     partial=partial
                 ))
 
-            else:
-                pass
+        else:
+            # print("No hits on %s" % i.id)
+            pass
     return(matches)
+
 
 def interpret_hits(arpA, chu, TspE4, yjaA):
     if arpA:
@@ -162,9 +170,9 @@ def interpret_hits(arpA, chu, TspE4, yjaA):
             if TspE4 and yjaA:
                 result = "U"
             elif not TspE4 and not yjaA:
-                result = "B1/E"
+                result = "E/D"
             elif TspE4:
-                result = "B1/E"
+                result = "E/D"
             else:
                 assert yjaA, "error interpretting results!"
                 result = "E/Cryptic"
@@ -175,17 +183,22 @@ def interpret_hits(arpA, chu, TspE4, yjaA):
                 result = "A"
             elif TspE4:
                 result = "B1"
-            elif yjaA:
+            else:
+                assert yjaA, "error interpretting results"
                 result = "A/C"
     else:
-        if not chu:
-            result = "cryptic"
-        else:
+        if chu:
             if yjaA or TspE4:
-                result = "B1"
+                result = "B2"
             else:
                 result = "F"
+        else:
+            if yjaA:
+                result = "cryptic"
+            else:
+                result = "U"
     return(result)
+
 
 def main():
     args = get_args()
@@ -197,8 +210,9 @@ def main():
     TspE4C2_2b = "AGTTTATCGCTGCGGGTCGC"
     AceK_f = "AACGCTATTCGCCAGCTTGC"
     ArpA1_r = "TCTCCCCATACCGTACGCTA"
-    ArpAgpE_f = "GATTCCATCTTGTCAAAATATGCC"
-    ArpAgpE_r = "GAAAAGAAAAAGAATTCCCAAGAG"
+    # lets not be hasty
+    # ArpAgpE_f = "GATTCCATCTTGTCAAAATATGCC"
+    # ArpAgpE_r = "GAAAAGAAAAAGAATTCCCAAGAG"
     trpBA_f = "CGGCGATAAAGACATCTTCAC"
     trpBA_r = "GCAACGCGGCCTGGCGGAAG"
 
@@ -209,58 +223,139 @@ def main():
 
     controls = [trpBA_f, trpBA_r]
     logger = logging.getLogger('root')
+    # logging.basicConfig(level=logging.DEBUG)
+    # logger.info("reading sequences")
+    print("Reading in sequence(s)")
     with open(args.contigs, 'r') as fasta:
         seqs = list(SeqIO.parse(fasta, 'fasta'))
+
     # Start with the Control primers before trying to
-    fwd = re.compile(controls[0], re.IGNORECASE)
-    rev = re.compile(str(SeqRecord(Seq(controls[1]).reverse_complement()).seq),
-                     re.IGNORECASE)
-    forward_control_matches = get_matches(seq_list=seqs, fwd=fwd, rev=rev,
+    # fwd = re.compile(controls[0], re.IGNORECASE)
+    # rev = re.compile(str(SeqRecord(Seq(controls[1]).reverse_complement()).seq),
+    #                  re.IGNORECASE)
+    print("Running Control PCR")
+    forward_control_matches = get_matches(seq_list=seqs,
+                                          fwd_primer=controls[0],
+                                          rev_primer=controls[1],
                                           partial=args.partial,
                                           expected_size=489,
                                           strand='+',
                                           logger=logger)
-    reverse_control_matches = get_matches(seq_list=seqs, fwd=fwd, rev=rev,
+    reverse_control_matches = get_matches(seq_list=seqs,
+                                          fwd_primer=controls[0],
+                                          rev_primer=controls[1],
                                           partial=args.partial,
                                           expected_size=489,
                                           strand='-',
                                           logger=logger)
 
-    if len(forward_control_matches) and len(reverse_control_matches) == 0:
+    if (
+            len(forward_control_matches) == 0 and
+            len(reverse_control_matches) == 0):
         if not args.no_control:
-            logger.info("No matches found for control PCR.  Exiting")
+            print("No matches found for control PCR.  Exiting")
             sys.exit(1)
         else:
-            logger.info("No matches found for control PCR, but continuing analysis")
+            print("No matches found for control PCR, but continuing analysis")
+    else:
+        logger.debug("control PCR successful")
     # run Clermont Typing
-    for key, val in quad_primers.items():
-        fwd = re.compile(val[0], re.IGNORECASE)
-        rev = re.compile(str(SeqRecord(Seq(val[1]).reverse_complement()).seq),
-                         re.IGNORECASE)
-        fwd_matches = get_matches(seq_list=seqs, fwd=fwd, rev=rev,
+    print("Running Quadriplex PCR")
+    profile = ""
+    for key, val in sorted(quad_primers.items()):
+        print("Scanning %s" % key)
+        # fwd = re.compile(val[0], re.IGNORECASE)
+        # rev = re.compile(str(SeqRecord(Seq(val[1]).reverse_complement()).seq),
+        #                  re.IGNORECASE)
+        fwd_matches = get_matches(seq_list=seqs,
+                                  fwd_primer=val[0],
+                                  rev_primer=val[1],
                                   partial=args.partial,
                                   expected_size=val[2],
                                   strand='+',
                                   logger=logger)
 
-        rev_matches = get_matches(seq_list=seqs, fwd=fwd, rev=rev,
+        rev_matches = get_matches(seq_list=seqs,
+                                  fwd_primer=val[0],
+                                  rev_primer=val[1],
                                   partial=args.partial,
                                   expected_size=val[2],
                                   strand='-',
                                   logger=logger)
-
-        if len(fwd_matches) or len(rev_matches) != 0:
-            print("%s: +" % key)
+        if len(fwd_matches) != 0 or len(rev_matches) != 0:
+            # print("%s: +" % key)
+            profile = "{0}\n{1}: +".format(profile, key)
             val.append(True)
         else:
-            print("%s: -" % key)
+            # print("%s: -" % key)
+            profile = "{0}\n{1}: -".format(profile, key)
             val.append(False)
+    print("-------- Results -------")
+    print(profile)
+    print("--------   --    -------")
     Clermont_type = interpret_hits(arpA=quad_primers['arpA'][3],
-                   chu=quad_primers['chu'][3],
-                   TspE4=quad_primers['TspE4'][3],
-                   yjaA=quad_primers['yjaA'][3])
+                                   chu=quad_primers['chu'][3],
+                                   TspE4=quad_primers['TspE4'][3],
+                                   yjaA=quad_primers['yjaA'][3])
     print("Clermont type: %s" % Clermont_type)
+    print("------------------------")
 
+
+class clermontTestCase(unittest.TestCase):
+    """
+    """
+    logger = logging
+
+    def test_interpret(self):
+
+        ref = ['A', 'A/C', 'B1', 'A/C', 'E/D', 'E/D', 'E/Cryptic', 'E/D',
+               'E/D', 'F', 'B2', 'B2', 'B2', 'cryptic', 'E/Cryptic', 'U']
+        test = []
+        # if True:
+        # A's
+        test.append(interpret_hits(arpA=True, chu=False, yjaA=False, TspE4=False))
+        test.append(interpret_hits(arpA=True, chu=False, yjaA=True, TspE4=False))
+        # B1
+        test.append(interpret_hits(arpA=True, chu=False, yjaA=False, TspE4=True))
+        # C
+        test.append(interpret_hits(arpA=True, chu=False, yjaA=True, TspE4=False))
+        # E
+        test.append(interpret_hits(arpA=True, chu=True, yjaA=False, TspE4=False))
+        test.append(interpret_hits(arpA=True, chu=True, yjaA=False, TspE4=True))
+        test.append(interpret_hits(arpA=True, chu=True, yjaA=True, TspE4=False))
+        # D
+        test.append(interpret_hits(arpA=True, chu=True, yjaA=False, TspE4=False))
+        test.append(interpret_hits(arpA=True, chu=True, yjaA=False, TspE4=True))
+        # F
+        test.append(interpret_hits(arpA=False, chu=True, yjaA=False, TspE4=False))
+        # B2
+        test.append(interpret_hits(arpA=False, chu=True, yjaA=True, TspE4=False))
+        test.append(interpret_hits(arpA=False, chu=True, yjaA=False, TspE4=True))
+        test.append(interpret_hits(arpA=False, chu=True, yjaA=True, TspE4=True))
+        # cryptic
+        test.append(interpret_hits(arpA=False, chu=False, yjaA=True, TspE4=False))
+        test.append(interpret_hits(arpA=True, chu=True, yjaA=True, TspE4=False))
+        # unknown
+        test.append(interpret_hits(arpA=False, chu=False, yjaA=False, TspE4=False))
+        print(ref)
+        print(test)
+        self.assertEqual(ref, test)
+
+    def test_get_matches(self):
+        test_seq = [SeqRecord(
+            Seq("GCACAGTCGATCAAAATTTTTGCAGTCGACTGGACTGACTGTCGGATCTCAGTCAT"))]
+        test_fwd = "GCACAG"
+        test_rev = "TGACTG"
+        self.assertEqual(test_fwd.search(str(test_seq[0].seq)).span(), (0, 6))
+        forward_control_matches = get_matches(
+            seq_list=test_seq,
+            fwd_primer=test_fwd,
+            rev=test_rev,
+            partial=True,
+            expected_size=60,
+            strand='+',
+            logger=logging)
+        self.assertEqual(forward_control_matches[0].R_end, 55)
 
 
 if __name__ == "__main__":

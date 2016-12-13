@@ -33,3 +33,10 @@ This is provided with no guarantee that it will correlate nicely with your exper
 
 
 Have fun!
+
+
+### Testing
+The script also contains two really basic tests that can be run by either unittests or nosetests.
+
+### Requirements
+Biopython
