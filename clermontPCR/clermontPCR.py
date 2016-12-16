@@ -3,10 +3,8 @@
 import re
 import argparse
 import sys
-import Bio
 import unittest
 import itertools
-import logging
 
 from Bio.Seq import Seq
 from Bio import SeqIO
@@ -27,7 +25,7 @@ class PcrHit(object):
                  F_hit=None,
                  R_hit=None,
                  partial=False):
-        # int: unique identifier for cluster
+        # int: unique identifier for match
         self.index = next(PcrHit.newid)
         self.template_orientation = template_orientation
         self.template_id = template_id
@@ -89,7 +87,8 @@ def get_args():  # pragma: no cover
     return args
 
 
-def get_matches(seq_list, fwd_primer, rev_primer, expected_size, partial=False, strand="+", logger=None):
+def get_matches(seq_list, fwd_primer, rev_primer, expected_size,
+                partial=False, strand="+"):
     """given a seqence list  and regex compilations of your primers
     return the matches
     """
@@ -166,7 +165,6 @@ def get_matches(seq_list, fwd_primer, rev_primer, expected_size, partial=False, 
 def interpret_hits(arpA, chu, TspE4, yjaA):
     if arpA:
         if chu:
-            # either D or E
             if TspE4 and yjaA:
                 result = "U"
             elif not TspE4 and not yjaA:
@@ -222,32 +220,24 @@ def main():
                     "arpA": [AceK_f, ArpA1_r, 400]}
 
     controls = [trpBA_f, trpBA_r]
-    logger = logging.getLogger('root')
-    # logging.basicConfig(level=logging.DEBUG)
-    # logger.info("reading sequences")
     print("Reading in sequence(s)")
     with open(args.contigs, 'r') as fasta:
         seqs = list(SeqIO.parse(fasta, 'fasta'))
 
-    # Start with the Control primers before trying to
-    # fwd = re.compile(controls[0], re.IGNORECASE)
-    # rev = re.compile(str(SeqRecord(Seq(controls[1]).reverse_complement()).seq),
-    #                  re.IGNORECASE)
+    # Start with the Control primers before trying anythong else
     print("Running Control PCR")
     forward_control_matches = get_matches(seq_list=seqs,
                                           fwd_primer=controls[0],
                                           rev_primer=controls[1],
                                           partial=args.partial,
                                           expected_size=489,
-                                          strand='+',
-                                          logger=logger)
+                                          strand='+')
     reverse_control_matches = get_matches(seq_list=seqs,
                                           fwd_primer=controls[0],
                                           rev_primer=controls[1],
                                           partial=args.partial,
                                           expected_size=489,
-                                          strand='-',
-                                          logger=logger)
+                                          strand='-')
 
     if (
             len(forward_control_matches) == 0 and
@@ -258,7 +248,7 @@ def main():
         else:
             print("No matches found for control PCR, but continuing analysis")
     else:
-        logger.debug("control PCR successful")
+        pass
     # run Clermont Typing
     print("Running Quadriplex PCR")
     profile = ""
@@ -272,16 +262,14 @@ def main():
                                   rev_primer=val[1],
                                   partial=args.partial,
                                   expected_size=val[2],
-                                  strand='+',
-                                  logger=logger)
+                                  strand='+')
 
         rev_matches = get_matches(seq_list=seqs,
                                   fwd_primer=val[0],
                                   rev_primer=val[1],
                                   partial=args.partial,
                                   expected_size=val[2],
-                                  strand='-',
-                                  logger=logger)
+                                  strand='-')
         if len(fwd_matches) != 0 or len(rev_matches) != 0:
             # print("%s: +" % key)
             profile = "{0}\n{1}: +".format(profile, key)
@@ -290,7 +278,7 @@ def main():
             # print("%s: -" % key)
             profile = "{0}\n{1}: -".format(profile, key)
             val.append(False)
-    print("-------- Results -------")
+    print("\n-------- Results -------")
     print(profile)
     print("--------   --    -------")
     Clermont_type = interpret_hits(arpA=quad_primers['arpA'][3],
@@ -298,14 +286,12 @@ def main():
                                    TspE4=quad_primers['TspE4'][3],
                                    yjaA=quad_primers['yjaA'][3])
     print("Clermont type: %s" % Clermont_type)
-    print("------------------------")
+    print("------------------------\n")
 
 
 class clermontTestCase(unittest.TestCase):
     """
     """
-    logger = logging
-
     def test_interpret(self):
 
         ref = ['A', 'A/C', 'B1', 'A/C', 'E/D', 'E/D', 'E/Cryptic', 'E/D',
@@ -353,8 +339,7 @@ class clermontTestCase(unittest.TestCase):
             rev=test_rev,
             partial=True,
             expected_size=60,
-            strand='+',
-            logger=logging)
+            strand='+')
         self.assertEqual(forward_control_matches[0].R_end, 55)
 
 
