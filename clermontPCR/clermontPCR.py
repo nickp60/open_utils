@@ -3,6 +3,7 @@
 import re
 import argparse
 import sys
+import os
 import unittest
 import itertools
 
@@ -109,17 +110,17 @@ def get_matches(seq_list, fwd_primer, rev_primer, expected_size,
         coords_R = None
         try:
             coords_F = fwd.search(str(i.seq)).span()
-            print("F match!")
+            sys.stderr.write("F match!\n")
         except:
             pass
         try:
             coords_R = rev.search(str(i.seq)).span()
-            print("R match!")
+            sys.stderr.write("R match!\n")
         except:
             pass
 
         if coords_F is not None and coords_R is not None:
-            print("Match found on %s (%s)" % (i.id, strand))
+            sys.stderr.write("Match found on %s (%s)\n" % (i.id, strand))
             matches.append(PcrHit(
                 template_orientation=strand,
                 template_id=i.id,
@@ -131,7 +132,7 @@ def get_matches(seq_list, fwd_primer, rev_primer, expected_size,
             ))
         elif coords_F is not None:
             if len(i.seq[coords_F[0]:]) > expected_size:
-                print("Possible match on %s (%s)" % (i.id, strand))
+                sys.stderr.write("Possible match on %s (%s)\n" % (i.id, strand))
                 matches.append(PcrHit(
                     template_orientation=strand,
                     template_id=i.id,
@@ -145,7 +146,7 @@ def get_matches(seq_list, fwd_primer, rev_primer, expected_size,
                 pass
         elif coords_R is not None:
             if not coords_R[0] < expected_size:
-                print("Possible match on %s (%s)" % (i.id, strand))
+                sys.stderr.write("Possible match on %s (%s)\n" % (i.id, strand))
                 matches.append(PcrHit(
                     template_orientation=strand,
                     template_id=i.id,
@@ -157,7 +158,7 @@ def get_matches(seq_list, fwd_primer, rev_primer, expected_size,
                 ))
 
         else:
-            # print("No hits on %s" % i.id)
+            # sys.stderr.write("No hits on %s" % i.id)
             pass
     return(matches)
 
@@ -220,12 +221,12 @@ def main():
                     "arpA": [AceK_f, ArpA1_r, 400]}
 
     controls = [trpBA_f, trpBA_r]
-    print("Reading in sequence(s)")
+    sys.stderr.write("Reading in sequence(s)\n")
     with open(args.contigs, 'r') as fasta:
         seqs = list(SeqIO.parse(fasta, 'fasta'))
 
     # Start with the Control primers before trying anythong else
-    print("Running Control PCR")
+    sys.stderr.write("Running Control PCR\n")
     forward_control_matches = get_matches(seq_list=seqs,
                                           fwd_primer=controls[0],
                                           rev_primer=controls[1],
@@ -243,20 +244,18 @@ def main():
             len(forward_control_matches) == 0 and
             len(reverse_control_matches) == 0):
         if not args.no_control:
-            print("No matches found for control PCR.  Exiting")
+            sys.stderr.write("No matches found for control PCR.  Exiting\n")
             sys.exit(1)
         else:
-            print("No matches found for control PCR, but continuing analysis")
+            sys.stderr.write(
+                "No matches found for control PCR, but continuing analysis\n")
     else:
         pass
     # run Clermont Typing
-    print("Running Quadriplex PCR")
+    sys.stderr.write("Running Quadriplex PCR\n")
     profile = ""
     for key, val in sorted(quad_primers.items()):
-        print("Scanning %s" % key)
-        # fwd = re.compile(val[0], re.IGNORECASE)
-        # rev = re.compile(str(SeqRecord(Seq(val[1]).reverse_complement()).seq),
-        #                  re.IGNORECASE)
+        sys.stderr.write("Scanning %s\n" % key)
         fwd_matches = get_matches(seq_list=seqs,
                                   fwd_primer=val[0],
                                   rev_primer=val[1],
@@ -271,22 +270,28 @@ def main():
                                   expected_size=val[2],
                                   strand='-')
         if len(fwd_matches) != 0 or len(rev_matches) != 0:
-            # print("%s: +" % key)
+            # sys.stderr.write("%s: +" % key)
             profile = "{0}\n{1}: +".format(profile, key)
             val.append(True)
         else:
-            # print("%s: -" % key)
+            # sys.stderr.write("%s: -" % key)
             profile = "{0}\n{1}: -".format(profile, key)
             val.append(False)
-    print("\n-------- Results -------")
-    print(profile)
-    print("--------   --    -------")
+    sys.stderr.write("\n-------- Results -------\n")
+    sys.stderr.write(profile)
+    sys.stderr.write("--------   --    -------\n")
     Clermont_type = interpret_hits(arpA=quad_primers['arpA'][3],
                                    chu=quad_primers['chu'][3],
                                    TspE4=quad_primers['TspE4'][3],
                                    yjaA=quad_primers['yjaA'][3])
-    print("Clermont type: %s" % Clermont_type)
-    print("------------------------\n")
+    sys.stderr.write("Clermont type: %s\n" % Clermont_type)
+    sys.stderr.write("------------------------\n")
+    # This should be the only thing being written to stdout
+    sys.stdout.write(
+        "{0}\t{1}\n".format(
+            os.path.splitext(os.path.basename(args.contigs))[0],
+            Clermont_type
+        ))
 
 
 class clermontTestCase(unittest.TestCase):
@@ -299,30 +304,46 @@ class clermontTestCase(unittest.TestCase):
         test = []
         # if True:
         # A's
-        test.append(interpret_hits(arpA=True, chu=False, yjaA=False, TspE4=False))
-        test.append(interpret_hits(arpA=True, chu=False, yjaA=True, TspE4=False))
+        test.append(
+            interpret_hits(arpA=True, chu=False, yjaA=False, TspE4=False))
+        test.append(
+            interpret_hits(arpA=True, chu=False, yjaA=True, TspE4=False))
         # B1
-        test.append(interpret_hits(arpA=True, chu=False, yjaA=False, TspE4=True))
+        test.append(
+            interpret_hits(arpA=True, chu=False, yjaA=False, TspE4=True))
         # C
-        test.append(interpret_hits(arpA=True, chu=False, yjaA=True, TspE4=False))
+        test.append(
+            interpret_hits(arpA=True, chu=False, yjaA=True, TspE4=False))
         # E
-        test.append(interpret_hits(arpA=True, chu=True, yjaA=False, TspE4=False))
-        test.append(interpret_hits(arpA=True, chu=True, yjaA=False, TspE4=True))
-        test.append(interpret_hits(arpA=True, chu=True, yjaA=True, TspE4=False))
+        test.append(
+            interpret_hits(arpA=True, chu=True, yjaA=False, TspE4=False))
+        test.append(
+            interpret_hits(arpA=True, chu=True, yjaA=False, TspE4=True))
+        test.append(
+            interpret_hits(arpA=True, chu=True, yjaA=True, TspE4=False))
         # D
-        test.append(interpret_hits(arpA=True, chu=True, yjaA=False, TspE4=False))
-        test.append(interpret_hits(arpA=True, chu=True, yjaA=False, TspE4=True))
+        test.append(
+            interpret_hits(arpA=True, chu=True, yjaA=False, TspE4=False))
+        test.append(
+            interpret_hits(arpA=True, chu=True, yjaA=False, TspE4=True))
         # F
-        test.append(interpret_hits(arpA=False, chu=True, yjaA=False, TspE4=False))
+        test.append(
+            interpret_hits(arpA=False, chu=True, yjaA=False, TspE4=False))
         # B2
-        test.append(interpret_hits(arpA=False, chu=True, yjaA=True, TspE4=False))
-        test.append(interpret_hits(arpA=False, chu=True, yjaA=False, TspE4=True))
-        test.append(interpret_hits(arpA=False, chu=True, yjaA=True, TspE4=True))
+        test.append(
+            interpret_hits(arpA=False, chu=True, yjaA=True, TspE4=False))
+        test.append(
+            interpret_hits(arpA=False, chu=True, yjaA=False, TspE4=True))
+        test.append(
+            interpret_hits(arpA=False, chu=True, yjaA=True, TspE4=True))
         # cryptic
-        test.append(interpret_hits(arpA=False, chu=False, yjaA=True, TspE4=False))
-        test.append(interpret_hits(arpA=True, chu=True, yjaA=True, TspE4=False))
+        test.append(
+            interpret_hits(arpA=False, chu=False, yjaA=True, TspE4=False))
+        test.append(
+            interpret_hits(arpA=True, chu=True, yjaA=True, TspE4=False))
         # unknown
-        test.append(interpret_hits(arpA=False, chu=False, yjaA=False, TspE4=False))
+        test.append(
+            interpret_hits(arpA=False, chu=False, yjaA=False, TspE4=False))
         print(ref)
         print(test)
         self.assertEqual(ref, test)

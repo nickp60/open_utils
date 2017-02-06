@@ -26,8 +26,16 @@ optional arguments:
 ```
 
 
-It print out the presense or absence of the PCR product.  It doesnt check the length or anything fancy.  When using --partial, if a single primer has a hit but the contig starts/ends within the length of the expected product size, we call it a hit.
+It prints out the presense or absence of the PCR product to stderr.  It doesnt check the length or anything fancy.  When using --partial, if a single primer has a hit but the contig starts/ends within the length of the expected product size, we call it a hit.
 
+A minimal "filename.fasta    ClermontType" output can be piped to a results file using a shell loop:
+
+```
+for i in strain1 strain2 strain3;
+	do
+	python3 clermontPCR.py ${i} >> results.txt
+done
+```
 
 This is provided with no guarantee that it will correlate nicely with your experimental data.  If your PCRs work nicely in the lab and disagree with what this program tells you, I would say 'bands don't lie' and move on.
 
