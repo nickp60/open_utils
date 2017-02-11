@@ -76,9 +76,9 @@ def get_args():  # pragma: no cover
                           "matches that could be intereupted by contig " +
                           "breaks are reported",
                           default=False)
-    optional.add_argument("-c", "--no_control", dest='no_control',
+    optional.add_argument("-c", "--ignore_control", dest='ignore_control',
                           action="store_true",
-                          help="ignore failure of control PCR",
+                          help="if control PCR fails, continue",
                           default=False)
     # had to make this explicitly to call it a faux optional arg
     optional.add_argument("-h", "--help",
@@ -243,12 +243,17 @@ def main():
     if (
             len(forward_control_matches) == 0 and
             len(reverse_control_matches) == 0):
-        if not args.no_control:
-            sys.stderr.write("No matches found for control PCR.  Exiting\n")
-            sys.exit(1)
-        else:
+        if args.ignore_control:
             sys.stderr.write(
                 "No matches found for control PCR, but continuing analysis\n")
+        else:
+            sys.stderr.write("No matches found for control PCR.  Exiting\n")
+            sys.stdout.write(
+                "{0}\t{1}\n".format(
+                    os.path.splitext(os.path.basename(args.contigs))[0],
+                    "control_fail"
+                ))
+            sys.exit(1)
     else:
         pass
     # run Clermont Typing
@@ -279,6 +284,7 @@ def main():
             val.append(False)
     sys.stderr.write("\n-------- Results -------\n")
     sys.stderr.write(profile)
+    sys.stderr.write("\n")
     sys.stderr.write("--------   --    -------\n")
     Clermont_type = interpret_hits(arpA=quad_primers['arpA'][3],
                                    chu=quad_primers['chu'][3],

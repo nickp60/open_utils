@@ -5,7 +5,7 @@
 # minor version changes:
 #  improved arg_bool to have defaults
 test_args<-c("~/GitHub/R/")
-arg_handle_help<-function(args_vector,  version="0.0", def_args=test_args, help_message2=help_message){
+arg_handle_help <- function(args_vector,  version="0.0", def_args=test_args, help_message2=help_message){
   # elipsis is to pass help_message down function chain
   if(is.null(help_message2)){ help_message2="help message here"}
   CONTINUE_bool=F

@@ -56,28 +56,44 @@ import numpy as np
 from Bio.Alphabet import IUPAC
 from Bio.Blast import NCBIXML
 from Bio.Blast.Applications import NcbiblastpCommandline
-DEBUG=False
 
-#define inputs
-remake_blast_db=False
-nuc_flag=False
-if DEBUG:
-    input_genome = os.path.expanduser("~/GitHub/BlastDBs/genbank_genomes/uams1.gb")
-    input_target_fasta = os.path.expanduser("~/GitHub/BlastDBs/fasta_genomes/MRSA252.txt")
-    nuc_flag=True
-    remake_blast_db=True
-    pattern='(.*gene=)(.*?)](.*)'
-    rename_fa=True
-else:
-    parser = argparse.ArgumentParser(description='Reciprocal blast for crude genome reannotation. \
-    Requires a .gb file as the query and a protein fasta as the target for reannotation')
-    parser.add_argument("query_db", help="path to .gb or .gbk Genbank genome file")
-    parser.add_argument("target_db", help="target amino acid fasta file to compare your query genome to")
-    parser.add_argument("-n","--nucleotide", help="T if you need a nucleotide fasta returned")
-    parser.add_argument("-r","--remake", help="T if you want to remake the blast databases")
-    parser.add_argument("-g","--grep_pattern", default='(.*gene=)(.*?)](.*)', help="grep pattern for isolating the locus_tag in the target fasta", type=str)
-    parser.add_argument("-f","--rename_fa", help="T  if you would like to try to simplify the names in the resulting genomic fasta file")
+DEBUG = False
+
+REMAKE_BLAST_DBS = False
+NUC_FLAG = False
+
+
+def get_args():
+    parser = argparse.ArgumentParser(
+        description="Reciprocal blast for crude genome reannotation. " +
+        "Requires a .gb file as the query and a protein fasta as the target " +
+        "for reannotation",
+        add_help=False)
+    parser.add_argument("query_db",
+                        help="path to .gb or .gbk Genbank genome file")
+    parser.add_argument("target_db",
+                        help="target amino acid fasta file to compare " +
+                        "your query genome to")
+    optional = parser.add_argument_group('optional arguments')
+    optional.add_argument("-n", "--nucleotide",
+                          action="store_true",
+                          help="use if you need a nucleotide fasta returned")
+    optional.add_argument("-r", "--remake",
+                          action="store_true",
+                          help="use if you want to remake the blast databases")
+    optional.add_argument("-g", "--grep_pattern",
+                          default='(.*gene=)(.*?)](.*)',
+                          help="grep pattern for isolating the locus_" +
+                          "tag in the target fasta",
+                          type=str)
+    optional.add_argument("-f", "--rename_fa",
+                          help="T  if you would like to try to simplify " +
+                          "the names in the resulting genomic fasta file")
     args = parser.parse_args()
+    return args
+
+if __name__ == "__main__":
+    args = get_args()
     input_genome = args.query_db
     input_target_fasta = args.target_db
     if str(args.nucleotide).lower() =="t" or str(args.nucleotide).lower() =="true" :
@@ -95,13 +111,15 @@ else:
         remake_blast_db=False
 
 
-#%%
 #print(str("input_target_fasta is "+ input_target_fasta)) # sanity check
 gb = os.path.basename(input_genome).partition(".")[0]
+
 #print(str("gb is "+ gb)) # sanity check
 input_target = os.path.basename(input_target_fasta).partition(".")[0]
+
 #print(str("input_target is "+ input_target)) # sanity check
 bdb_name = str(input_target+"_db") #name for blast database to be created
+
 #print(str("bdb_name is "+ bdb_name)) # sanity check
 
 now = datetime.datetime.now()
