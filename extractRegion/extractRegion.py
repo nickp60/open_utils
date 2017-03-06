@@ -153,8 +153,9 @@ def main():
             rec_ids.append(str(rec.id + " "))
     check_missing_or_duplicated(fastaids=rec_ids,
                                 extids=[x[1] for x in nameChromStartEnd])
-    for ncse in nameChromStartEnd:
-        logger.debug("processing entry:")
+    nregions = len(nameChromStartEnd)
+    for idx, ncse in enumerate(nameChromStartEnd):
+        logger.debug("processing entry %i of %i:", idx, nregions)
         logger.debug(ncse)
         if ncse[0] == "" and args.name != "":
             ncse[0] = args.name

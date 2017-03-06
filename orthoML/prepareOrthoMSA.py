@@ -7,15 +7,12 @@ import shutil
 import datetime
 import subprocess
 import argparse
-import multiprocessing
 import logging
-from operator import itemgetter
 import pandas as pd
 import numpy as np
 from Bio import SeqIO
 from Bio.Seq import Seq
 from Bio.SeqRecord import SeqRecord
-from Bio.Blast.Applications import NcbiblastxCommandline
 from Bio import AlignIO
 
 
@@ -27,9 +24,9 @@ def get_args(DEBUG=False):
     parser.add_argument("-o", "--output", dest='output',
                         help="directory in which to place the output files",
                         default=os.path.join(os.getcwd(), "orthoMSA"))
-    parser.add_argument("-s", "--score_min",
-                        help="not currently used; will be used to determinine \
-                        an optional scoring threshold")
+    # parser.add_argument("-s", "--score_min",
+    #                     help="not currently used; will be used to" +
+    #                     "determinine an optional scoring threshold")
     parser.add_argument("--msa_tool", dest="msa_tool",
                           choices=["mafft", "prank"],
                           action="store", default="prank",
@@ -62,7 +59,7 @@ def prepare_prank_cmd(outdir, combined_fastas, prank_exe,
         prank_exe, add_args, combined_fastas,
         os.path.join(outdir, outfile_name))
     logger.debug("PRANK command: \n %s", prank_cmd)
-    return (prank_cmd, os.path.join(outdir, str(outfile_name + ".fasta")))
+    return (prank_cmd, os.path.join(outdir, str(outfile_name + ".best.fas")))
 
 
 def prepare_mafft_cmd(outdir, combined_fastas, mafft_exe,
@@ -214,6 +211,12 @@ def main(args):
                 # SeqIO.write(SeqRecord(item[1].seq.translate(),
                 #                       id=item[1].id), outp, "fasta")
                 SeqIO.write(item[1], outp, "fasta")
+    # PRANK automatcally renames the alignemnt with the suffix .best.fas,
+    # so we anticipate that here
+    if args.msa_tool == "mafft":
+        suffix = ".fasta"
+    else:
+        suffix = ".best.fas"
     msas = []
     for key, items in gene_entries.items():
         outpath = os.path.join(output_root, key + "_regions.fasta")
@@ -226,7 +229,7 @@ def main(args):
                                          args='',
                                          outname=os.path.join(
                                              output_root,
-                                             key + "_alligned_regions.fasta"),
+                                             key + "_alligned_nuc_regions.fasta"),
                                          mafft_exe=args.mafft_exe,
                                          outdir=output_root,
                                          logger=logger)
@@ -248,18 +251,19 @@ def main(args):
                                       id=item[1].id), outprot, "fasta")
 
                 # SeqIO.write(item[1], outp, "fasta")
-        msa_cmd_prot, results_path_prot = make_msa(msa_tool="mafft",
-                                                   unaligned_seqs=outpath_prot,
-                                                   prank_exe='',
-                                                   args='',
-                                                   outname=os.path.join(
-                                                       output_root,
-                                                       key + "_alligned_regions.faa"),
-                                                   mafft_exe=args.mafft_exe,
-                                                   outdir=output_root,
-                                                   logger=logger)
+        msa_cmd_prot, results_path_prot = make_msa(
+            msa_tool=args.msa_tool,
+            unaligned_seqs=outpath_prot,
+            # unaligned_seqs=os.path.splitext(outpath_prot)[0] + suffix,
+            prank_exe=args.prank_exe,
+            args='',
+            outname=os.path.join(output_root,
+                                 key + "_alligned_aa_regions.faa"),
+            mafft_exe=args.mafft_exe,
+            outdir=output_root,
+            logger=logger)
 
-        logger.info("Running %s for MSA of %s", "mafft", key)
+        logger.info("Running %s for MSA of translated %s", args.msa_tool, key)
         subprocess.run(msa_cmd_prot,
                        shell=sys.platform != "win32",
                        stdout=subprocess.PIPE,

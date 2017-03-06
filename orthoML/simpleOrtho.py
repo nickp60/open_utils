@@ -16,17 +16,16 @@ from Bio.Blast.Applications import NcbitblastnCommandline
 
 def get_args(DEBUG=False):
     parser = argparse.ArgumentParser(
-        description="This does some simple blasting to get region of interest")
+        description="This does some simple reciprocol blasting to get region of interest")
     parser.add_argument("db_aa",
-                        help="file containing gene accessions. if delimited," +
-                        " use the headers in the example file as a template")
+                        help="fasta containing gene accessions")
     parser.add_argument("genomes_dir", help="dir with and only iwth genomes")
     parser.add_argument("-o", "--output", dest='output',
                         help="directory in which to place the output files",
                         default=os.path.join(os.getcwd(), "simpleOrtho"))
     parser.add_argument("-p", "--min_percent", dest="min_percent",
                         help="minimum percent identity",
-                        default=90, type=int)
+                        default=85, type=int)
     # parser.add_argument("-t", "--blast_type",
     #                     help="blastn or tblastx", default="tblastx")
     args = parser.parse_args()
