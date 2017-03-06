@@ -16,19 +16,15 @@ USAGE:
 """
 import argparse
 import sys
-import re
 import logging
 import os
-import io
 import pysam
-from Bio import SeqIO
-from Bio.SeqRecord import SeqRecord
 
 def get_args():
     parser = argparse.ArgumentParser(
-        description="Given a set of coords (and an optional chromosome " +
-        "or contig), extract a region of the genome.  It goes to " +
-        "standard out, which can easily be redirected to a file with '>'")
+        description="given a bam file, this will index, sort, and filter " +
+        "out any reads with an alignment score less than --min_AS_score " +
+        "(100 by default)")
     parser.add_argument("bam_file", help="input genome")
     parser.add_argument("-a", "--min_AS_score", dest="AS_min",
                         help="region list; " +
@@ -54,10 +50,11 @@ def filter_bam_AS(inbam, outsam, score, logger=None):
     """
     notag = 0
     written = 0
+    unwritten = 0  # cant read my mind
     sortf = os.path.join(os.path.dirname(inbam),
                         os.path.splitext(inbam)[0] + "_sorted.bam")
     print(sortf)
-    # pysam.sort(inbam, sortf)
+    pysam.sort(inbam, "-o", sortf)
     pysam.index(sortf)
     bam = pysam.AlignmentFile(sortf, "rb")
     osam = pysam.Samfile(outsam, 'wh', template=bam)
@@ -67,11 +64,13 @@ def filter_bam_AS(inbam, outsam, score, logger=None):
                 osam.write(read)
                 written = written + 1
             else:
+                unwritten = unwritten + 1
                 pass
         else:
             notag = notag + 1
             pass
     bam.close()
+    logger.debug("Reads before filtering: %i", written + unwritten)
     logger.debug("Reads after filtering: %i", written)
     if notag != 0:
         logger.debug("Reads lacking alignment score: %i", notag)
@@ -94,7 +93,7 @@ def main():
         logger.error("Output file already exists.  Exiting...")
         sys.exit(1)
     # try:
-    filter_bam_AS(inbam=args.bam_file,
+    filter_bam_AS(inbam=os.path.abspath(os.path.expanduser(args.bam_file)),
                   outsam=args.outfile,
                   score=args.AS_min,
                   logger=logger)

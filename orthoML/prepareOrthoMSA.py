@@ -30,10 +30,15 @@ def get_args(DEBUG=False):
     parser.add_argument("-s", "--score_min",
                         help="not currently used; will be used to determinine \
                         an optional scoring threshold")
-    # parser.add_argument("--prank_exe", dest="prank_exe",
-    #                     action="store", default="prank",
-    #                     help="Path to PRANK executable; " +
-    #                     "default: %(default)s")
+    parser.add_argument("--msa_tool", dest="msa_tool",
+                          choices=["mafft", "prank"],
+                          action="store", default="prank",
+                          help="which aligner to use; " +
+                          "default: %(default)s")
+    parser.add_argument("--prank_exe", dest="prank_exe",
+                        action="store", default="prank",
+                        help="Path to PRANK executable; " +
+                        "default: %(default)s")
     parser.add_argument("--mafft_exe", dest="mafft_exe",
                         action="store", default="mafft",
                         help="Path to MAFFT executable; " +
@@ -42,6 +47,22 @@ def get_args(DEBUG=False):
                         help="blastn or tblastx", default="tblastx")
     args = parser.parse_args()
     return(args)
+
+
+def prepare_prank_cmd(outdir, combined_fastas, prank_exe,
+                      add_args="", outfile_name="best_MSA",
+                      logger=None):
+    """returns command line for constructing MSA with
+    PRANK and the path to results file
+    """
+    assert logger is not None, "Must use logger"
+    if not os.path.exists(outdir):
+        raise FileNotFoundError("output directory not found!")
+    prank_cmd = "{0} {1} -d={2} -o={3}".format(
+        prank_exe, add_args, combined_fastas,
+        os.path.join(outdir, outfile_name))
+    logger.debug("PRANK command: \n %s", prank_cmd)
+    return (prank_cmd, os.path.join(outdir, str(outfile_name + ".fasta")))
 
 
 def prepare_mafft_cmd(outdir, combined_fastas, mafft_exe,
@@ -60,22 +81,52 @@ def prepare_mafft_cmd(outdir, combined_fastas, mafft_exe,
     return (mafft_cmd, os.path.join(outdir, outfile_name))
 
 
-def make_msa(msa_tool, unaligned_seqs, outname, prank_exe, mafft_exe,
-             args, outdir, logger=None):
+# def make_msa(msa_tool, unaligned_seqs, outname, prank_exe, mafft_exe,
+#              args, outdir, logger=None):
+#     """returns msa cmd and results path
+#     """
+#     assert logger is not None, "Must use logger"
+#     if shutil.which(mafft_exe) is not None:
+#         msa_cmd, results_path = prepare_mafft_cmd(
+#             outdir=outdir,
+#             outfile_name=outname,
+#             combined_fastas=unaligned_seqs,
+#             mafft_exe=shutil.which(mafft_exe),
+#             add_args=args,
+#             logger=logger)
+#     else:
+#         raise ValueError("Construction of MSA skipped because " +
+#                          "%s is not a valid executable!", mafft_exe)
+#     return(msa_cmd, results_path)
+def make_msa(msa_tool, unaligned_seqs, prank_exe, mafft_exe,
+             args, outname, outdir, logger=None):
     """returns msa cmd and results path
     """
     assert logger is not None, "Must use logger"
-    if shutil.which(mafft_exe) is not None:
-        msa_cmd, results_path = prepare_mafft_cmd(
-            outdir=outdir,
-            outfile_name=outname,
-            combined_fastas=unaligned_seqs,
-            mafft_exe=shutil.which(mafft_exe),
-            add_args=args,
-            logger=logger)
-    else:
-        raise ValueError("Construction of MSA skipped because " +
-                         "%s is not a valid executable!", mafft_exe)
+    if msa_tool == "prank":
+        if shutil.which(prank_exe) is not None:
+            msa_cmd, results_path = prepare_prank_cmd(
+                outdir=outdir,
+                outfile_name=os.path.splitext(outname)[0],
+                combined_fastas=unaligned_seqs,
+                prank_exe=prank_exe,
+                add_args=args,
+                logger=logger)
+        else:
+            raise ValueError("Construction of MSA skipped because " +
+                             "%s is not a valid executable!", prank_exe)
+    elif msa_tool == "mafft":
+        if shutil.which(mafft_exe) is not None:
+            msa_cmd, results_path = prepare_mafft_cmd(
+                outdir=outdir,
+                outfile_name=outname,
+                combined_fastas=unaligned_seqs,
+                mafft_exe=mafft_exe,
+                add_args=args,
+                logger=logger)
+        else:
+            raise ValueError("Construction of MSA skipped because " +
+                             "%s is not a valid executable!", mafft_exe)
     return(msa_cmd, results_path)
 
 
@@ -93,7 +144,8 @@ def process_msa_list(msa_list, name=""):
         genes = [x.split("@")[0].split("_")[0] for x in names]
         # print(genomes)
         # print(genes)
-        assert all([genes[0] == x for x in genes[1:]]), "Alignment must be of the same gene!"
+        assert all([genes[0] == x for x in genes[1:]]), \
+            "Alignment must be of the same gene!"
         # print("passed assertion")
         transp = align_df.T
         transp.columns = genomes
@@ -168,9 +220,9 @@ def main(args):
         with open(outpath, "w") as outp:
             for item in items:
                 SeqIO.write(item[1], outp, "fasta")
-        msa_cmd, results_path = make_msa(msa_tool="mafft",
+        msa_cmd, results_path = make_msa(msa_tool=args.msa_tool,
                                          unaligned_seqs=outpath,
-                                         prank_exe='',
+                                         prank_exe=args.prank_exe,
                                          args='',
                                          outname=os.path.join(
                                              output_root,
@@ -179,7 +231,7 @@ def main(args):
                                          outdir=output_root,
                                          logger=logger)
 
-        logger.info("Running %s for MSA of %s", "mafft", key)
+        logger.info("Running %s for MSA of %s", args.msa_tool, key)
         subprocess.run(msa_cmd,
                        shell=sys.platform != "win32",
                        stdout=subprocess.PIPE,

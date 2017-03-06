@@ -24,9 +24,9 @@ def get_args(DEBUG=False):
     parser.add_argument("-o", "--output", dest='output',
                         help="directory in which to place the output files",
                         default=os.path.join(os.getcwd(), "simpleOrtho"))
-    parser.add_argument("-s", "--score_min",
-                        help="not currently used; will be used to determinine \
-                        an optional scoring threshold")
+    parser.add_argument("-p", "--min_percent", dest="min_percent",
+                        help="minimum percent identity",
+                        default=90, type=int)
     # parser.add_argument("-t", "--blast_type",
     #                     help="blastn or tblastx", default="tblastx")
     args = parser.parse_args()
@@ -154,7 +154,7 @@ def BLAST_tab_to_df(path):
     return raw_csv_results
 
 
-def filter_recip_BLAST_df(df1, df2, logger=None):
+def filter_recip_BLAST_df(df1, df2, min_percent, logger=None):
     """ results from pd.read_csv with default BLAST output 6 columns
     df1 must be genomes against genes, and df2 must be genes against genomes,
     because we have to split the names so all all the contigs are recognized
@@ -183,9 +183,9 @@ def filter_recip_BLAST_df(df1, df2, logger=None):
             if tempdf1.empty or tempdf2.empty:
                 logger.info("skipping %s in %s", gene, genome)
             else:
-                subset1 = tempdf1.loc[(tempdf1["identity_perc"] > 90) &
+                subset1 = tempdf1.loc[(tempdf1["identity_perc"] > min_percent) &
                                       (tempdf1["bit_score"] == tempdf1["bit_score"].max())]
-                subset2 = tempdf2.loc[(tempdf2["identity_perc"] > 90) &
+                subset2 = tempdf2.loc[(tempdf2["identity_perc"] > min_percent) &
                                       (tempdf2["bit_score"] == tempdf2["bit_score"].max())]
                 logger.debug("grouped df shape: ")
                 logger.debug(tempdf1.shape)
@@ -303,7 +303,11 @@ def main(args):
                    outfile_name=recip_merged_tab)
     resultsdf = BLAST_tab_to_df(merged_tab)
     recip_resultsdf = BLAST_tab_to_df(recip_merged_tab)
-    filtered_hits = filter_recip_BLAST_df(df1=resultsdf, df2=recip_resultsdf, logger=logger)
+    filtered_hits = filter_recip_BLAST_df(
+        df1=resultsdf,
+        df2=recip_resultsdf,
+        min_percent=args.min_percent,
+        logger=logger)
     write_pipe_extract_cmds(outfile=os.path.join(output_root, "simpleOrtho_regions.txt"),
                             df=filtered_hits, logger=logger)
 
