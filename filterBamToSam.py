@@ -27,6 +27,7 @@ def get_args():
         "(100 by default)")
     parser.add_argument("bam_file", help="input genome")
     parser.add_argument("-a", "--min_AS_score", dest="AS_min",
+                        type=int,
                         help="region list; " +
                         "if you have a lot of regions, this file " +
                         "will be used instead of the coords arg",
@@ -52,7 +53,7 @@ def filter_bam_AS(inbam, outsam, score, logger=None):
     written = 0
     unwritten = 0  # cant read my mind
     sortf = os.path.join(os.path.dirname(inbam),
-                        os.path.splitext(inbam)[0] + "_sorted.bam")
+                         os.path.splitext(inbam)[0] + "_sorted.bam")
     print(sortf)
     pysam.sort(inbam, "-o", sortf)
     pysam.index(sortf)
@@ -60,6 +61,7 @@ def filter_bam_AS(inbam, outsam, score, logger=None):
     osam = pysam.Samfile(outsam, 'wh', template=bam)
     for read in bam.fetch():
         if read.has_tag('AS'):
+            # print(type(read.get_tag('AS')))
             if read.get_tag('AS') >= score:
                 osam.write(read)
                 written = written + 1

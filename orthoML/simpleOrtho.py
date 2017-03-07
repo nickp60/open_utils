@@ -9,6 +9,7 @@ import subprocess
 import argparse
 import multiprocessing
 import logging
+import time
 import pandas as pd
 from Bio.Blast.Applications import NcbiblastxCommandline
 from Bio.Blast.Applications import NcbitblastnCommandline
@@ -30,6 +31,39 @@ def get_args(DEBUG=False):
     #                     help="blastn or tblastx", default="tblastx")
     args = parser.parse_args()
     return(args)
+
+logger = logging.getLogger('root')
+
+
+def set_up_logging(outdir):
+    """
+    """
+    logger.setLevel(logging.DEBUG)
+    # create console handler and set level to given verbosity
+    console_err = logging.StreamHandler(sys.stderr)
+    console_err.setLevel(level=20)
+    console_err_format = logging.Formatter(str("%(asctime)s - " +
+                                               "%(levelname)s - %(message)s"),
+                                           "%Y%m%d %H:%M:%S")
+    console_err.setFormatter(console_err_format)
+    logger.addHandler(console_err)
+    # create debug file handler and set level to debug
+    try:
+        logfile_handler = logging.FileHandler(
+            os.path.join(outdir,
+                         str("{0}_{1}_log.txt".format(
+                             time.strftime("%Y%m%d%H%M"), "simpleOrtho"))), "w")
+        logfile_handler.setLevel(logging.DEBUG)
+        logfile_handler_formatter = \
+            logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
+        logfile_handler.setFormatter(logfile_handler_formatter)
+        logger.addHandler(logfile_handler)
+    except:
+        logger.error("Could not write log file to {0} for logging".format(
+            outdir))
+        sys.exit(1)
+    logger.info("Initializing logger")
+    return logger
 
 
 def setup_blast_db(input_file, input_type="fasta", dbtype="prot",
@@ -75,7 +109,7 @@ def make_prot_nuc_recip_blast_cmds(
     logger.info("Creating protein BLAST database")
     db_dir = os.path.join(output,
                           os.path.splitext(os.path.basename(subject_file))[0])
-    os.makedirs(db_dir)
+    os.makedirs(db_dir, exist_ok=True)
     protdb = os.path.join(db_dir,
                           os.path.splitext(os.path.basename(subject_file))[0])
 
@@ -182,16 +216,21 @@ def filter_recip_BLAST_df(df1, df2, min_percent, logger=None):
             if tempdf1.empty or tempdf2.empty:
                 logger.info("skipping %s in %s", gene, genome)
             else:
-                subset1 = tempdf1.loc[(tempdf1["identity_perc"] > min_percent) &
-                                      (tempdf1["bit_score"] == tempdf1["bit_score"].max())]
-                subset2 = tempdf2.loc[(tempdf2["identity_perc"] > min_percent) &
-                                      (tempdf2["bit_score"] == tempdf2["bit_score"].max())]
+                subset1 = tempdf1.loc[
+                    (tempdf1["identity_perc"] > min_percent) &
+                    (tempdf1["bit_score"] == tempdf1["bit_score"].max())]
+                # (tempdf1["alignement_l"] == tempdf1["bit_score"].max())]
+                subset2 = tempdf2.loc[
+                    (tempdf2["identity_perc"] > min_percent) &
+                    (tempdf2["bit_score"] == tempdf2["bit_score"].max())]
                 logger.debug("grouped df shape: ")
                 logger.debug(tempdf1.shape)
-                logger.debug("grouped df2 shape: %s")
+                logger.debug("grouped df2 shape: " )
                 logger.debug(tempdf2.shape)
                 if subset1.empty or subset2.empty:
                     logger.info("No reciprocol hits for %s in %s", gene, genome)
+                    logger.debug(tempdf1)
+                    logger.debug(tempdf2)
                     nonrecip_hits.append([gene, genome])
                 else:
                     # logger.debug(tempdf1)
@@ -252,20 +291,23 @@ def write_pipe_extract_cmds(df, outfile, logger=None):
 
 
 def main(args):
-    logger = logging.getLogger('simpleOrtho')
-    logging.basicConfig(stream=sys.stderr, level=logging.DEBUG,
-                        format='%(name)s (%(levelname)s): %(message)s')
-    logger.setLevel(logging.DEBUG)
-    logger.debug("All settings used:")
+    EXISTING_DIR = False
     output_root = os.path.abspath(os.path.expanduser(args.output))
-    for k, v in sorted(vars(args).items()):
-        logger.debug("{0}: {1}".format(k, v))
     if not os.path.isdir(output_root):
-        logger.info("creating output directory %s", output_root)
+        sys.stderr.write("creating output directory %s\n" % output_root)
         os.makedirs(output_root)
     else:
-        logger.error("Output Directory already exists!")
-        sys.exit(1)
+        sys.stderr.write("Output Directory already exists!\n")
+        EXISTING_DIR = True
+        # sys.exit(1)
+    # logger = logging.getLogger('simpleOrtho')
+    logger = set_up_logging(outdir=output_root)
+    # logging.basicConfig(stream=sys.stderr, level=logging.DEBUG,
+    #                     format='%(name)s (%(levelname)s): %(message)s')
+    # logger.setLevel(logging.DEBUG)
+    logger.debug("All settings used:")
+    for k, v in sorted(vars(args).items()):
+        logger.debug("{0}: {1}".format(k, v))
     date = str(datetime.datetime.now().strftime('%Y%m%d'))
 
     genomes = get_complete_paths_of_files(args.genomes_dir)
@@ -276,26 +318,35 @@ def main(args):
             subject_file=args.db_aa,
             output=output_root, date=date,
             logger=logger)
-    pool = multiprocessing.Pool()
-    logger.debug("Running the following commands in parallel " +
-                 "(this could take a while):")
-    logger.debug("\n" + "\n".join([x for x in commands]))
-    results = [
-        pool.apply_async(subprocess.run,
-                         (cmd,),
-                         {"shell": sys.platform != "win32",
-                          "stdout": subprocess.PIPE,
-                          "stderr": subprocess.PIPE,
-                          "check": True})
-        for cmd in commands]
-    pool.close()
-    pool.join()
-    reslist = []
-    reslist.append([r.get() for r in results])
+    # check for existing blast results
+    if not all([os.path.isfile(x) for x in paths_to_outputs]):
+        if EXISTING_DIR:
+            logger.error("existing output dir found, but not all " +
+                         "the needed blast results were found. Cannot use " +
+                         "this directory")
+            sys.exit(1)
+        pool = multiprocessing.Pool()
+        logger.debug("Running the following commands in parallel " +
+                     "(this could take a while):")
+        logger.debug("\n" + "\n".join([x for x in commands]))
+        results = [
+            pool.apply_async(subprocess.run,
+                             (cmd,),
+                             {"shell": sys.platform != "win32",
+                              "stdout": subprocess.PIPE,
+                              "stderr": subprocess.PIPE,
+                              "check": True})
+            for cmd in commands]
+        pool.close()
+        pool.join()
+        reslist = []
+        reslist.append([r.get() for r in results])
+    else:
+        pass
     merged_tab = os.path.join(output_root,
-                              "merged_results.tab")
+                                  "merged_results.tab")
     recip_merged_tab = os.path.join(output_root,
-                                    "recip_merged_results.tab")
+                                "recip_merged_results.tab")
     merge_outfiles(filelist=paths_to_outputs,
                    outfile_name=merged_tab)
     merge_outfiles(filelist=paths_to_recip_outputs,
