@@ -24,6 +24,9 @@ def get_args():
     #                     dest="clobber",
     #                     default=False,
     #                     action="store_true")
+    parser.add_argument("-s", "--start_from", action="store", dest="start_from",
+                        help="if you get interupted, restart from this index",
+                        default=0, type=int)
     parser.add_argument("-e", "--email", action="store", dest="email",
                         help="email address",
                         default='joe_smith@mail.gov', type=str)
@@ -37,7 +40,7 @@ def get_args():
 
 
 def fetch_and_write_seqs(accessions, destination, region, db='nucleotide',
-                         outfmt='fasta', concat=False):
+                         outfmt='fasta', concat=False, logger=None):
     """
     now should be able to detect and handle ftp calls to NCBI only
     takes an accession list
@@ -46,24 +49,24 @@ def fetch_and_write_seqs(accessions, destination, region, db='nucleotide',
     concat, smooshed into one file. Returns 0 if succesful
     """
     if len(accessions) > 1 and region:
-        print("region will be ignored when using multiple accessions!")
+        logger.info("region will be ignored when using multiple accessions!")
     if outfmt == 'fasta':
         rettype = 'fasta'
     elif outfmt == "gb":
         rettype = "gbwithparts"
     else:
-        print("only supports fasta and gb")
+        logger.error("only supports fasta and gb")
         sys.exit(1)
     i = accessions[0]
     if region:
         outf = str(destination.strip() +
                    i + ":" + region + "." + outfmt)
         if len(region.strip().split(":")) != 2:
-            print("Region must be two colon-sparated integers!")
+            logger.error("Region must be two colon-sparated integers!")
             sys.exit(1)
         reg_start, reg_end = region.strip().split(":")
-        print("fetching %s from %s to %s as %s" % (
-            i, reg_start, reg_end, outfmt))
+        logger.debug("fetching %s from %s to %s as %s",
+                     i, reg_start, reg_end, outfmt)
         out_handle = open(outf, "w")
         sequence_handle = Entrez.efetch(
             db=db, id=i, rettype=rettype,
@@ -73,7 +76,7 @@ def fetch_and_write_seqs(accessions, destination, region, db='nucleotide',
     else:
         outf = str(destination.strip() +
                    i + "." + outfmt)
-        print("fetching %s as %s" % (i, outfmt))
+        logger.debug("fetching %s as %s", i, outfmt)
         out_handle = open(outf, "w")
         sequence_handle = Entrez.efetch(
             db=db, id=i, rettype=rettype, retmode="text")
@@ -84,12 +87,12 @@ def fetch_and_write_seqs(accessions, destination, region, db='nucleotide',
     return outf
 
 
-def getAccessionAndCoords(rec):
+def getAccessionAndCoords(rec, logger):
     """ use efetch to get the nucleotide sequence from a protein genbank.
 relies on having curl and grep, so its pretty janky.
     """
     identifier = rec.id.split("|")[3]
-    print(identifier)
+    logger.debug("Finding  coding sequence associated with %s", identifier)
     cmd = 'curl -L "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=protein&id={0}&rettype=gp" | grep coded_by'.format(identifier)
     # {0}".format(shutil.which(backtranseq))
     try:
@@ -99,10 +102,10 @@ relies on having curl and grep, so its pretty janky.
                              stderr=subprocess.PIPE,
                              check=True)
     except:
-        print("Error trying to get coords for %s using id %s" % (
+        logger.warning("Error trying to get coords for %s using id %s" % (
             rec, identifier))
-        print("with the command:")
-        print(cmd)
+        logger.warning("with the command:")
+        logger.warning(cmd)
         return None, None, None
     outline = res.stdout.decode("utf-8").replace(" ", "")
     # /coded_by="complement(NC_004337.2:1806396..1807301)"
@@ -137,14 +140,20 @@ def main():
     os.makedirs(outdir)
     os.makedirs(outtemp)
     #  start processing the records
+    entries = 0
     records = SeqIO.parse(args.infile, "fasta")
+    for rec in records:
+        entries = entries + 1
     tsv_lines = []
     fastas = []
     records = SeqIO.parse(args.infile, "fasta")
     for idx, i in enumerate(records):
-        if idx == 5:
-            break
-        protacc, acc, region = getAccessionAndCoords(i)
+        if idx < args.start_from:
+            continue
+        logger.debug("processing record %i/%i", idx, entries)
+        # if idx < 5:
+        #     break
+        protacc, acc, region = getAccessionAndCoords(i, logger=logger)
         if not protacc:
             continue
         try:
@@ -184,7 +193,6 @@ def main():
                 simplified_rec.description = ""
                 simplified_rec.name = None
                 simplified_rec.id = tsv_lines[idx].split("\t")[0]
-                print(simplified_rec)
                 SeqIO.write(simplified_rec, outfasta, "fasta")
     logger.info("Finished")
 
