@@ -110,7 +110,14 @@ relies on having curl and grep, so its pretty janky.
     outline = res.stdout.decode("utf-8").replace(" ", "")
     # /coded_by="complement(NC_004337.2:1806396..1807301)"
     outline = outline.split('"')[1]
-    accession, outline = outline.split(':')
+    try:
+        accession, outline = outline.split(':')
+    except:
+        logger.error("Unable to split the following line to " +
+                     "separate accession and location:")
+        logger.error(outline)
+        logger.error("skipping")
+        return None, None, None
     accession = accession.replace("complement(", "")
     accession = accession.replace("join(", "")
     outline = outline.replace(')', "")
@@ -161,7 +168,7 @@ def main():
                 accessions=[acc],
                 destination=os.path.join(outtemp, ""),
                 region=region, db='nucleotide',
-                outfmt='fasta', concat=False)
+                outfmt='fasta', concat=False, logger=logger)
         except Exception as e:
             logger.warning("something went wrong while fetching seqs:")
             logger.warning(e)
