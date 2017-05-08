@@ -114,21 +114,35 @@ def fetch_and_write_fasta(accessions, destination, region, db='nucleotide',
         if len(region.strip().split(":")) != 2:
             return 1
         reg_start, reg_end = region.strip().split(":")
-        out_handle = open(outf, "w")
-        sequence_handle = Entrez.efetch(
-            db=db, id=i, rettype=rettype,
-            retmode="text",
-            seq_start=reg_start,
-            seq_stop=reg_end)
+        try:
+            out_handle = open(outf, "w")
+        except Exception as e:
+            print(e)
+            return 3
+        try:
+            sequence_handle = Entrez.efetch(
+                db=db, id=i, rettype=rettype,
+                retmode="text",
+                seq_start=reg_start,
+                seq_stop=reg_end)
+        except Exception as e:
+            print(e)
+            out_handle.close()
+            return 2
     else:
         outf = str(destination.strip() +
                    i + ".fasta")
-        out_handle = open(outf, "w")
+        try:
+            out_handle = open(outf, "w")
+        except Exception as e:
+            print(e)
+            return 3
         try:
             sequence_handle = Entrez.efetch(
                 db=db, id=i, rettype=rettype, retmode="text")
         except Exception as e:
             print(e)
+            out_handle.close()
             return 2
     try:
         for line in sequence_handle:
@@ -136,6 +150,8 @@ def fetch_and_write_fasta(accessions, destination, region, db='nucleotide',
         out_handle.close()
     except Exception as e:
         print(e)
+        sequence_handle.close()
+        out_handle.close()
         return 3
     sequence_handle.close()
     return 0
@@ -342,3 +358,26 @@ class aribaRenamer(unittest.TestCase):
             destination=self.testdir,
             region=self.acc_dict["NP_708230.1"][1], db='nucleotide',
             concat=False)
+        self.assertEqual(0, fcode0)
+
+        fcode1 = fetch_and_write_fasta(
+            accessions=self.acc_dict["NP_708230.1"][0],
+            destination=self.testdir,
+            region="1100:2200:3366",
+            db='nucleotide',
+            concat=False)
+        self.assertEqual(1, fcode1)
+
+        fcode2 = fetch_and_write_fasta(
+            accessions=self.acc_dict["NP_708230.1"][0],
+            destination=self.testdir,
+            region=self.acc_dict["NP_708230.1"][1], db='porcupine',
+            concat=False)
+        self.assertEqual(2, fcode2)
+
+        fcode3 = fetch_and_write_fasta(
+            accessions=self.acc_dict["NP_708230.1"][0],
+            destination=os.path.join(self.testdir, "porcupine_recipes", ""),
+            region=self.acc_dict["NP_708230.1"][1], db='nucleotide',
+            concat=False)
+        self.assertEqual(3, fcode3)
