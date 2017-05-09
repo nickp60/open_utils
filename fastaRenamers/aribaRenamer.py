@@ -80,23 +80,71 @@ relies on having curl and grep, so its pretty janky.
     outline = res.stdout.decode("utf-8").replace(" ", "")
     # /coded_by="complement(NC_004337.2:1806396..1807301)"
     outline = outline.split('"')[1]
-    try:
-        accession, outline = outline.split(':')
-    except:
+
+    if "join" in outline:
+        # retry to make sure you have the whole line via this sed call
+        cmd = str('curl -L "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=protein&id=' +
+                  identifier +
+                  '&rettype=gp" | sed -n "/coded_by/,/\//{/coded_by/{p;n};/\//{q};p}"')
+        print(cmd)
+        try:
+            res = subprocess.run(cmd,
+                                 shell=sys.platform != "win32",
+                                 stdout=subprocess.PIPE,
+                                 stderr=subprocess.PIPE,
+                                 check=True)
+        except:
+            with open(resfile, "w") as resout:
+                resout.write("{0}\t{1}\t{2}\t{3}".format(
+                    identifier, "NULL", "NULL", "could not get accession"))
+            return 1
+        outline = res.stdout.decode("utf-8").replace(" ", "").replace("\n", "")
+        outline = outline.split('"')[1]
+        try:
+            outline = outline.replace("join(", "")
+            outline1, outline2 = outline.split(',')
+        except:
+            with open(resfile, "w") as resout:
+                resout.write("{0}\t{1}\t{2}\n".format(
+                    identifier,
+                    "NULL",
+                    str("joined accession: could not split ',' " +
+                        "for %" % outline)))
+            return 2
+        for oline in [outline1, outline2]:
+            print(oline)
+            accession, outline = oline.split(':')
+            outline = outline.replace(')', "")
+            outline = outline.replace('..', ":")
+            note = "joined"
+            with open(resfile, "a") as resout:
+                resout.write("{0}\t{1}\t{2}\t{3}\n".format(
+                    identifier, accession, outline, note))
+        return 0
+    else:
+        try:
+            accession, outline = outline.split(':')
+        except:
+            with open(resfile, "w") as resout:
+                resout.write("{0}\t{1}\t{2}\t{3}".format(
+                    identifier,
+                    "NULL",
+                    "NULL"
+                    str("could not split : for  %s" % outline)))
+            return 2
+
+        if "complement" in outline:
+            accession = accession.replace("complement(", "")
+            outline = outline.replace(')', "")
+            outline = outline.replace('..', ":")
+            note = "RC"
+        else:
+            outline = outline.replace('..', ":")
+            note = "-"
         with open(resfile, "w") as resout:
-            resout.write("{0}\t{1}\t{2}".format(
-                identifier,
-                "NULL",
-                str("could not split : for  %s" % outline)))
-        return 2
-    accession = accession.replace("complement(", "")
-    accession = accession.replace("join(", "")
-    outline = outline.replace(')', "")
-    outline = outline.replace('..', ":")
-    with open(resfile, "w") as resout:
-        resout.write("{0}\t{1}\t{2}".format(
-            identifier, accession, outline))
-    return 0
+            resout.write("{0}\t{1}\t{2}\t{3}\n".format(
+                identifier, accession, outline, note))
+        return 0
 
 
 def fetch_and_write_fasta(accessions, destination, region, db='nucleotide',
@@ -244,11 +292,12 @@ def main(args):
             if len(lines) != 1:
                 logger.error("how did we get a multiline result file for %s?",
                              acc_res)
-            protacc, acc, region = lines[0].strip().split("\t")
+                logger.error(lines)
+            protacc, acc, region, note = lines[0].strip().split("\t")
             if "NULL" in acc:
                 logger.warning("Error getting coordinates for accession %s:",
                                protacc)
-                logger.warning(region)
+                logger.warning(note)
                 failed_records.append(
                     [protacc, "error fetching or parsing protein accession"])
                 continue
