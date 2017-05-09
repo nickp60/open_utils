@@ -32,6 +32,13 @@ def get_args():
                         dest="start_from",
                         help="if you get interupted, restart from this index",
                         default=0, type=int)
+    parser.add_argument("-j", "--just_aggregate", action="store_true",
+                        dest="just_aggregate",
+                        help="if you get interupted, after fetching all the " +
+                        "accession, rerun with this to do the name " +
+                        "conversion and aggregations for all the files " +
+                        " ending in *_status",
+                        default=False)
     parser.add_argument("-e", "--email", action="store", dest="email",
                         help="email address",
                         required=True, default='', type=str)
@@ -57,7 +64,7 @@ relies on having curl and grep, so its pretty janky.
     """
     identifier = rec.id.split("|")[3]
     resfile = os.path.join(outdir, str(idx) + "_status")
-    print("Getting Accessions for %s, item %d of %d" % (identifier, idx, nseqs))
+    print("Getting Accessions for %s, item %d of %d" % (identifier, idx + 1, nseqs))
     cmd = 'curl -L "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=protein&id={0}&rettype=gp" | grep coded_by'.format(identifier)
     try:
         res = subprocess.run(cmd,
@@ -195,33 +202,38 @@ def main(args):
     outtemp = os.path.join(output_root, "temp")
     logger.info("temp folder: %s", outtemp)
     Entrez.email = args.email
-    if os.path.isdir(output_root):
-        logger.error("Output file exists! exiting")
-        sys.exit(1)
-    os.makedirs(output_root)
-    os.makedirs(outtemp)
-    os.makedirs(outtemp_get_accessions)
-    #  start processing the records
+    if not args.just_aggregate:
+        if os.path.isdir(output_root):
+            logger.error("Output file exists! exiting")
+            sys.exit(1)
+        os.makedirs(output_root)
+        os.makedirs(outtemp)
+        os.makedirs(outtemp_get_accessions)
+        #  start processing the records
     entries = 0
     records = SeqIO.parse(args.infile, "fasta")
     for rec in records:
         entries = entries + 1
     failed_records = []
-    records = SeqIO.parse(args.infile, "fasta")
-    # run all the getAccessionCoords
-    pool = multiprocessing.Pool(processes=args.cores)
-    results = [
-        pool.apply_async(getAccessionAndCoords,
-                         (rec,),
-                         {"outdir": outtemp_get_accessions,
-                          "nseqs": entries,
-                          "idx": idx})
-        for idx, rec in enumerate(records)]
-    pool.close()
-    pool.join()
-    logger.info("Sum of return codes (should be 0):")
-    logger.info(sum([r.get() for r in results]))
-
+    if not args.just_aggregate:
+        logger.info("Getting the nucleotide accessions associated with " +
+                    "the protein IDs.  This can take a while.  " +
+                    "The best way to check progress is by the number " +
+                    "of output files in the temp dir")
+        records = SeqIO.parse(args.infile, "fasta")
+        # run all the getAccessionCoords
+        pool = multiprocessing.Pool(processes=args.cores)
+        results = [
+            pool.apply_async(getAccessionAndCoords,
+                             (rec,),
+                             {"outdir": outtemp_get_accessions,
+                              "nseqs": entries,
+                              "idx": idx})
+            for idx, rec in enumerate(records) if idx > args.start_from]
+        pool.close()
+        pool.join()
+        logger.info("Sum of return codes (should be 0):")
+        logger.info(sum([r.get() for r in results]))
     # get all the results files
     acc_results_files = glob.glob(os.path.join(outtemp_get_accessions, "") +
                                   "*_status")
@@ -229,7 +241,9 @@ def main(args):
     for acc_res in acc_results_files:
         with open(acc_res, "r") as f:
             lines = f.read().split('\n')
-            assert len(lines) == 1, "how did we get a multiline result file?"
+            if len(lines) != 1:
+                logger.error("how did we get a multiline result file for %s?",
+                             acc_res)
             protacc, acc, region = lines[0].strip().split("\t")
             if "NULL" in acc:
                 logger.warning("Error getting coordinates for accession %s:",
@@ -239,7 +253,9 @@ def main(args):
                     [protacc, "error fetching or parsing protein accession"])
                 continue
             acc_results[protacc] = [acc, region]
-    print(acc_results)
+    logger.info("Fetching the nucleotide sequences.  This can take a while." +
+                "  The best way to check progress is to count the " +
+                "output files")
     # run all the getAccessionCoords
     pool2 = multiprocessing.Pool(processes=args.cores)
     results_fetch = [
@@ -259,9 +275,12 @@ def main(args):
     fetched_files = glob.glob(str(os.path.join(outtemp, "") + "*fasta"))
     logger.info("Writing out final results ")
     idx = 0
+    idxs = len(acc_results)
     for protacc, recreg in acc_results.items():
         # check for output fasta
         idx = idx + 1
+        logger.info("Processing %s / %s:%s, item %d of %d",
+                    protacc, recreg[0], recreg[1], idx, idxs)
         target_fasta = "{0}{1}:{2}.fasta".format(
             os.path.join(outtemp, ""),
             recreg[0], recreg[1])
@@ -306,7 +325,9 @@ def main(args):
     with open(outerr, "a") as oerr:
         for errec in failed_records:
             oerr.write("{0}\t{1}".format(errec[0], errec[1]))
-
+    logger.info("Finished!")
+    logger.info("Check the errors.tsv files to figure out what happened " +
+                "with any accessions skipped")
 
 
 if __name__ == '__main__':
@@ -323,15 +344,14 @@ class aribaRenamer(unittest.TestCase):
     """
     def setUp(self):
         self.testfile = os.path.join(os.path.dirname(__file__),
-                                      "ariba_test.db")
+                                     "ariba_test.db")
         self.testdir = os.path.dirname(__file__)
-        with open(self.testfile, "r")  as t:
+        with open(self.testfile, "r") as t:
             self.reclist = list(SeqIO.parse(t, "fasta"))
         self.acc_dict = {'NP_708230.1': ['NC_004337.2', '2476842:2477336'],
                          'NP_707631.1': ['NC_004337.2', '1806396:1807301'],
                          'NP_752289.1': ['NC_004431.1', '326209:330324'],
                          'NP_752209.1': ['NC_004431.1', '253783:254469']}
-
 
     def test_getAccessions(self):
         """ Test all three return codes for dataset
