@@ -344,9 +344,9 @@ def main(args):
     else:
         pass
     merged_tab = os.path.join(output_root,
-                                  "merged_results.tab")
+                              "merged_results.tab")
     recip_merged_tab = os.path.join(output_root,
-                                "recip_merged_results.tab")
+                                    "recip_merged_results.tab")
     merge_outfiles(filelist=paths_to_outputs,
                    outfile_name=merged_tab)
     merge_outfiles(filelist=paths_to_recip_outputs,
@@ -358,7 +358,8 @@ def main(args):
         df2=recip_resultsdf,
         min_percent=args.min_percent,
         logger=logger)
-    write_pipe_extract_cmds(outfile=os.path.join(output_root, "simpleOrtho_regions.txt"),
+    write_pipe_extract_cmds(outfile=os.path.join(output_root,
+                                                 "simpleOrtho_regions.txt"),
                             df=filtered_hits, logger=logger)
 
 if __name__ == '__main__':
