@@ -39,14 +39,34 @@ def get_args():
     parser.add_argument("-l", "--list", dest="reglist",
                         help="region list; " +
                         "if you have a lot of regions, this file " +
-                        "will be used instead of the coords arg")
+                        "will be used instead of the coords arg", default=None)
+    parser.add_argument("-e", "--extra", dest="extra",
+                        help=" Get a region surrounding the region given," +
+                        "by this many bases "
+                        "default: %(default)s", type=int, default=0)
+    parser.add_argument("--negative", dest="negative",
+                        help="try to extract negative coords; " +
+                        "default (false) is to just output to simplify " +
+                        "to extracting to the end of the sequence;",
+                        action="store_true")
     parser.add_argument("-q", "--quick", dest="quick",
                         help="uses the experimental SimpleFastaParser;",
                         action="store_false", default=True)
 
+    # parser.add_argument("-s", "--simple", dest="simple",
+    #                     help="use a simplified header in output " +
+    #                     "(no special chars)",
+    #                     action="store_true", default=False)
+
     parser.add_argument("-n", "--name", help="An optional name to be added " +
                         "to the fasta header on output",
                         default="")
+    parser.add_argument("-v", "--verbosity",
+                        dest='verbosity', action="store",
+                        default=2, type=int,
+                        help="1 = debug(), 2 = info(), 3 = warning(), " +
+                        "4 = error() and 5 = critical(); " +
+                        "default: %(default)s")
     args = parser.parse_args()
     return(args)
 
@@ -70,10 +90,10 @@ def parse_coords(coords, from_stdin=False, logger=None):
     else:
         logger.error(coords)
         raise ValueError("must have either chrom:start:end or start:end")
-    logger.info(name)
-    logger.info(chrom)
-    logger.info(start)
-    logger.info(end)
+    logger.debug(name)
+    logger.debug(chrom)
+    logger.debug(start)
+    logger.debug(end)
 
     return(name, chrom, start, end)
 
@@ -118,29 +138,35 @@ def check_missing_or_duplicated(fastaids, extids):
 
 
 def main():
+    args = get_args()
     logger = logging.getLogger('extract_region')
     logging.basicConfig(stream=sys.stderr, level=logging.DEBUG,
                         format='%(name)s (%(levelname)s): %(message)s')
-    logger.setLevel(logging.DEBUG)
+    logger.setLevel(args.verbosity * 10)
     logger.debug("All settings used:")
     args = get_args()
     for k, v in sorted(vars(args).items()):
         logger.debug("{0}: {1}".format(k, v))
 
     COORDS_FROM_STDIN = False
-    if sys.stdin.isatty() and args.reglist is None:
+    logger.debug(os.isatty(0))
+    if not os.isatty(0) and args.reglist is None:
         # with open(args.coords) as c:
+        logger.debug("reading from stdin")
         coord_string_list = [args.coords.readlines()[0].strip()]
         COORDS_FROM_STDIN = True
     else:
         if args.reglist is not None:
-            logger.info("reading coords from file")
+            logger.debug("reading coords from file")
             coord_string_list = open(args.reglist).readlines()
             COORDS_FROM_STDIN = True
         else:
+            logger.debug("using coords passed as args")
             coord_string_list = [args.coords]
+    logger.info("processing %s", " ".join(coord_string_list))
     #hold all them names and stuff
     nameChromStartEnd = []
+    logger.debug("coord_string_list: %s", coord_string_list)
     for coords in [x.strip() for x in coord_string_list if x.strip() ]:
         name, chrom, start, end = parse_coords(coords,
                                                from_stdin=COORDS_FROM_STDIN,
@@ -151,12 +177,17 @@ def main():
     with open(args.fasta_file, "r") as f:
         for rec in SeqIO.parse(f, 'fasta'):
             rec_ids.append(str(rec.id + " "))
+    logger.debug(rec_ids)
     check_missing_or_duplicated(fastaids=rec_ids,
                                 extids=[x[1] for x in nameChromStartEnd])
     nregions = len(nameChromStartEnd)
     for idx, ncse in enumerate(nameChromStartEnd):
-        logger.debug("processing entry %i of %i:", idx, nregions)
+        logger.debug("processing entry %i of %i:", idx + 1, nregions)
         logger.debug(ncse)
+        logger.debug("adding %d extra to the ends:", args.extra)
+        ncse[2], ncse[3] = ncse[2] - args.extra, ncse[3] + args.extra
+        logger.debug(ncse)
+
         if ncse[0] == "" and args.name != "":
             ncse[0] = args.name
         logger.debug("extracting sequence named %s", ncse[1])
@@ -186,7 +217,15 @@ def main():
 
         ## get the region
         # seqid = "{0}_{1}{2}:{3}".format(record.id, name, start, end)
-        seqid = "{0}@{1}:{2}:{3}".format(
+        if not args.negative:
+            for coord in [ncse[2], ncse[3]]:
+                if coord < 0:
+                    coord = 0
+                elif coord > len(record.seq):
+                    coord = len(record.seq)
+                else:
+                    pass
+            seqid = "{0}@{1}:{2}:{3}".format(
             ncse[0], ncse[1], ncse[2], ncse[3])
         if ncse[0].endswith("-RC_"):
             logger.debug("getting RC")
@@ -204,6 +243,8 @@ def main():
             except Exception as e:
                 logger.error(str(type(e)) + ": " + str(e))
                 sys.exit(1)
+        # if args.simple:
+        #     subrec.id = subrec.id.replace("@", "_")
         SeqIO.write(subrec, sys.stdout, "fasta")
 
 

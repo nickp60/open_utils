@@ -29,19 +29,26 @@ def get_args(DEBUG=False):
                         default=85, type=int)
     # parser.add_argument("-t", "--blast_type",
     #                     help="blastn or tblastx", default="tblastx")
+    parser.add_argument("-v", "--verbosity",
+                        dest='verbosity', action="store",
+                        default=2, type=int,
+                        help="1 = debug(), 2 = info(), 3 = warning(), " +
+                        "4 = error() and 5 = critical(); " +
+                        "default: %(default)s")
     args = parser.parse_args()
     return(args)
+
 
 logger = logging.getLogger('root')
 
 
-def set_up_logging(outdir):
+def set_up_logging(outdir, level):
     """
     """
     logger.setLevel(logging.DEBUG)
     # create console handler and set level to given verbosity
     console_err = logging.StreamHandler(sys.stderr)
-    console_err.setLevel(level=20)
+    console_err.setLevel(level=level*10)
     console_err_format = logging.Formatter(str("%(asctime)s - " +
                                                "%(levelname)s - %(message)s"),
                                            "%Y%m%d %H:%M:%S")
@@ -301,7 +308,7 @@ def main(args):
         EXISTING_DIR = True
         # sys.exit(1)
     # logger = logging.getLogger('simpleOrtho')
-    logger = set_up_logging(outdir=output_root)
+    logger = set_up_logging(outdir=output_root, level=args.verbosity*10)
     # logging.basicConfig(stream=sys.stderr, level=logging.DEBUG,
     #                     format='%(name)s (%(levelname)s): %(message)s')
     # logger.setLevel(logging.DEBUG)

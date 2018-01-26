@@ -219,7 +219,6 @@ def get_matches(allele, seq_list, fwd_primer, rev_primer, expected_size,
         else:
             # sys.stderr.write("No hits on %s" % i.id)
             pass
-    print([x.__dict__ for x in matches])
     return(matches)
 
 
