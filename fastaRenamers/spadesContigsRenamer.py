@@ -1,17 +1,6 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
-Created on Mon Jul 18 11:44:26 2016
-version 0.6
-Minor version changes:
- - reads from stdin
-
-TODO:
-
-USAGE:
- $ python extract_region.py genome.fasta 3:111 > extractedregion.fasta
- $ python extract_region.py genome.fasta chrom1:3:111 > extractedregionfromcontig.fasta
- $ echo "mySuperGene@chrom1:3:111" | xargs extract_region.py genome.fasta  > extractedregionfromcontig.fasta
 
 """
 import argparse
