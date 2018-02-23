@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
 Created on Tue Feb 24 13:39:09 2015
@@ -335,7 +335,7 @@ make_db_command_query= str(
 #target
 test_path_target = os.path.join(home, "BLAST", bdb_name + '.psq')
 if os.path.exists(test_path_target) and remake_blast_db is False:
-    print "BLAST Database Already Exists"
+    print ("BLAST Database Already Exists")
 else:
     print("Creating BLAST database for %s ..." % bdb_name)
     subprocess.Popen(make_db_command_target, stdout=subprocess.PIPE,
@@ -343,7 +343,7 @@ else:
 #query
 test_path_query = os.path.join(home, "BLAST", gb + "_db.psq")
 if os.path.exists(test_path_query)and remake_blast_db is False:
-    print "BLAST Database Already Exists"
+    print( "BLAST Database Already Exists")
 else:
     print("Creating BLAST database for %s ..." % gb)
     subprocess.Popen(make_db_command_query, stdout=subprocess.PIPE,

@@ -167,7 +167,7 @@ def merge_outfiles(filelist, outfile_name):
     filelist = [i for i in filelist if i.split(".")[-1:] == ['tab']]
     if len(filelist) == 1:
         # print("only one file found! no merging needed")
-        return(filelist)
+        return(filelist[0])
     else:
         # print("merging all the blast results to %s" % outfile_name)
         nfiles = len(filelist)
@@ -354,12 +354,12 @@ def main(args):
                               "merged_results.tab")
     recip_merged_tab = os.path.join(output_root,
                                     "recip_merged_results.tab")
-    merge_outfiles(filelist=paths_to_outputs,
-                   outfile_name=merged_tab)
-    merge_outfiles(filelist=paths_to_recip_outputs,
-                   outfile_name=recip_merged_tab)
-    resultsdf = BLAST_tab_to_df(merged_tab)
-    recip_resultsdf = BLAST_tab_to_df(recip_merged_tab)
+    post_merged_tab = merge_outfiles(filelist=paths_to_outputs,
+                                            outfile_name=merged_tab)
+    post_recip_merged_tab = merge_outfiles(filelist=paths_to_recip_outputs,
+                                           outfile_name=recip_merged_tab)
+    resultsdf = BLAST_tab_to_df(post_merged_tab)
+    recip_resultsdf = BLAST_tab_to_df(post_recip_merged_tab)
     filtered_hits = filter_recip_BLAST_df(
         df1=resultsdf,
         df2=recip_resultsdf,
