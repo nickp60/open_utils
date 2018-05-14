@@ -13,6 +13,7 @@ import time
 import pandas as pd
 from Bio.Blast.Applications import NcbiblastxCommandline
 from Bio.Blast.Applications import NcbitblastnCommandline
+from Bio.Blast.Applications import NcbitblastxCommandline
 
 
 def get_args(DEBUG=False):
@@ -27,6 +28,17 @@ def get_args(DEBUG=False):
     parser.add_argument("-p", "--min_percent", dest="min_percent",
                         help="minimum percent identity",
                         default=85, type=int)
+    parser.add_argument("-t", "--threads", dest="threads",
+                        help="threads to use",
+                        default=1, type=int)
+    parser.add_argument("-n", "--nucleotide", dest="nucleotide",
+                        help="genes are written as nucleotides",
+                        action="store_true")
+    parser.add_argument("-s", "--split_names", dest="split_names",
+                        help="when parsing names in blast results, " +
+                        "only consider the prefix before the " +
+                        "underscore (rarely used)",
+                        action="store_true")
     # parser.add_argument("-t", "--blast_type",
     #                     help="blastn or tblastx", default="tblastx")
     parser.add_argument("-v", "--verbosity",
@@ -78,18 +90,21 @@ def setup_blast_db(input_file, input_type="fasta", dbtype="prot",
                    makeblastdb_exe='', logger=None):
     """
     This runs make blast db with the given parameters
-    requires logging, os, subprocess, shutil
+    requires logging, os, subprocess, shutil.
+    Further, this can be used with multiple files
     """
     if makeblastdb_exe == '':
         makeblastdb_exe = shutil.which("makeblastdb")
         if logger:
             logger.info("makeblastdb executable: %s", makeblastdb_exe)
-    makedbcmd = str("{0} -in {1} -input_type {2} -dbtype {3} " +
-                    "-out {4}").format(makeblastdb_exe,
-                                       input_file,
-                                       input_type,
-                                       dbtype,
-                                       out)
+    makedbcmd = str("cat {1} | {0} -input_type {2} -dbtype {3} " +
+                    "-out {4} -title {5}").format(
+                        makeblastdb_exe,
+                        input_file,
+                        input_type,
+                        dbtype,
+                        out,
+                        title)
     if logger:
         logger.info("Making blast db: {0}".format(makedbcmd))
     try:
@@ -152,6 +167,55 @@ def make_prot_nuc_recip_blast_cmds(
     return(blast_cmds, blast_outputs, recip_blast_outputs)
 
 
+def make_nuc_nuc_recip_blast_cmds(
+        query_list, date,
+        output, subject_file=None, logger=None):
+    """given a file, make a blast cmd, and return path to output csv
+    Only works is query_list is nucleotide and subject_file is nuc
+    """
+    assert logger is not None, "must use logging"
+    logger.info("Creating nucl BLAST database")
+    db_dir = os.path.join(output,
+                          os.path.splitext(os.path.basename(subject_file))[0])
+    os.makedirs(db_dir, exist_ok=True)
+    protdb = os.path.join(db_dir,
+                          os.path.splitext(os.path.basename(subject_file))[0])
+    nucdb = os.path.join(db_dir, "genomes")
+
+    setup_blast_db(input_file=args.db_aa, input_type="fasta", dbtype="nucl",
+                   out=protdb, logger=logger, title="gene")
+    setup_blast_db(input_file=os.path.join(args.genomes_dir, "", "*"), input_type="fasta", dbtype="nucl",
+                   out=nucdb, logger=logger, title="genome")
+    blast_cmds = []
+    blast_outputs = []
+    recip_blast_outputs = []
+    for f in query_list:
+        # run forward, genome aganst gene, blast
+        output_path_tab = str(
+            os.path.join(output, date) + "_simpleOrtho_results_" +
+            os.path.basename(f) + "_vs_nucdb.tab")
+        blast_cline = NcbitblastxCommandline(query=f,
+                                            db=protdb, evalue=.001,
+                                            outfmt=6, out=output_path_tab)
+        add_params = str(" -num_threads 1")
+        blast_command = str(str(blast_cline) + add_params)
+        blast_cmds.append(blast_command)
+        blast_outputs.append(output_path_tab)
+    # run reverse, gene against genomes, blast
+    recip_output_path_tab = str(
+        os.path.join(output, date) + "_simpleOrtho_results_" +
+        "nuc_vs_genomes.tab")
+    recip_blast_cline = NcbitblastxCommandline(query=subject_file,
+                                               db=nucdb,
+                                               evalue=.001,
+                                               outfmt=6, out=recip_output_path_tab)
+    recip_blast_command = str(str(recip_blast_cline))
+    # blast_cmds.append(recip_blast_command)
+    recip_blast_outputs.append(recip_output_path_tab)
+
+    return(blast_cmds, recip_blast_command, blast_outputs, recip_blast_outputs)
+
+
 def get_complete_paths_of_files(directory):
     filenames = []
     shortnames = [i for i in os.listdir(directory) if not os.path.isdir(os.path.join(directory, i))]
@@ -194,7 +258,7 @@ def BLAST_tab_to_df(path):
     return raw_csv_results
 
 
-def filter_recip_BLAST_df(df1, df2, min_percent, logger=None):
+def filter_recip_BLAST_df(df1, df2, min_percent, split_names=False, logger=None):
     """ results from pd.read_csv with default BLAST output 6 columns
     df1 must be genomes against genes, and df2 must be genes against genomes,
     because we have to split the names so all all the contigs are recognized
@@ -203,9 +267,15 @@ def filter_recip_BLAST_df(df1, df2, min_percent, logger=None):
     assert logger is not None, "must use a logger"
     logger.debug("shape of blast results")
     logger.debug("shape of recip blast results")
-    df1['genome'] = df1.query_id.str.split('_').str.get(0)
-    df2['genome'] = df2.subject_id.str.split('_').str.get(0)
-    logger.debug(df1.shape)
+    # I dont remember why I added this string split; seems problematic for assemblies
+    # I think if was to help with really long names?  I added this option to control it now
+    if split_names:
+        df1['genome'] = df1.query_id.str.split('_').str.get(0)
+        df2['genome'] = df2.subject_id.str.split('_').str.get(0)
+    else:
+        df1['genome'] = df1.query_id
+        df2['genome'] = df2.subject_id
+        logger.debug(df1.shape)
     logger.debug(df2.shape)
     # recip structure
     filtered = pd.DataFrame(columns=df1.columns)
@@ -316,15 +386,24 @@ def main(args):
     for k, v in sorted(vars(args).items()):
         logger.debug("{0}: {1}".format(k, v))
     date = str(datetime.datetime.now().strftime('%Y%m%d'))
-
+    if not os.path.isfile(args.db_aa):
+        raise FileNotFoundError("Input file %s not found!" % args.db_aa)
     genomes = get_complete_paths_of_files(args.genomes_dir)
+    if not args.nucleotide:
+        commands, paths_to_outputs, paths_to_recip_outputs = \
+            make_prot_nuc_recip_blast_cmds(
+                query_list=genomes,
+                subject_file=args.db_aa,
+                output=output_root, date=date,
+                logger=logger)
+    else:
+        commands, recip_cmd, paths_to_outputs, paths_to_recip_outputs = \
+            make_nuc_nuc_recip_blast_cmds(
+                query_list=genomes,
+                subject_file=args.db_aa,
+                output=output_root, date=date,
+                logger=logger)
 
-    commands, paths_to_outputs, paths_to_recip_outputs = \
-        make_prot_nuc_recip_blast_cmds(
-            query_list=genomes,
-            subject_file=args.db_aa,
-            output=output_root, date=date,
-            logger=logger)
     # check for existing blast results
     if not all([os.path.isfile(x) for x in paths_to_outputs]):
         if EXISTING_DIR:
@@ -348,6 +427,13 @@ def main(args):
         pool.join()
         reslist = []
         reslist.append([r.get() for r in results])
+        recip_cmd_full = recip_cmd + " -num_threads %d" % args.threads
+        logger.debug(recip_cmd_full)
+        subprocess.run(recip_cmd_full,
+                       shell=sys.platform != "win32",
+                       stdout=subprocess.PIPE,
+                       stderr=subprocess.PIPE, check=True)
+
     else:
         pass
     merged_tab = os.path.join(output_root,
@@ -364,6 +450,7 @@ def main(args):
         df1=resultsdf,
         df2=recip_resultsdf,
         min_percent=args.min_percent,
+        split_names=args.split_names,
         logger=logger)
     write_pipe_extract_cmds(outfile=os.path.join(output_root,
                                                  "simpleOrtho_regions.txt"),

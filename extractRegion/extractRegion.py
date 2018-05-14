@@ -30,9 +30,9 @@ def get_args():
         "or contig), extract a region of the genome.  It goes to " +
         "standard out, which can easily be redirected to a file with '>'")
     parser.add_argument('coords', nargs='?', type=str,
-                        default=sys.stdin,
                         help="start:end or chromosome:start:end; " +
-                        "can be read from standard in.  If reading from " +
+                        "can be read from standard in by using '-'. " +
+                        " If reading from " +
                         "stdin, can take an additional 'name' attribute: " +
                         "name@chromosome:start:end;")
     parser.add_argument("fasta_file", help="input genome")
@@ -120,6 +120,8 @@ def extract_record(path, chrom):
 
 
 def check_missing_or_duplicated(fastaids, extids):
+    if extids[0] is None:
+        return 0
     for i in extids:
         recs = []
         hits = 0
@@ -150,10 +152,11 @@ def main():
 
     COORDS_FROM_STDIN = False
     logger.debug(os.isatty(0))
-    if not os.isatty(0) and args.reglist is None:
+    if args.coords == "-" and args.reglist is None:
+    # if not os.isatty(0) and args.reglist is None:
         # with open(args.coords) as c:
         logger.debug("reading from stdin")
-        coord_string_list = [args.coords.readlines()[0].strip()]
+        coord_string_list = [sys.stdin.readlines()[0].strip()]
         COORDS_FROM_STDIN = True
     else:
         if args.reglist is not None:
