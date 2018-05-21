@@ -2,6 +2,7 @@
 """
 """
 import os
+import math
 import sys
 import shutil
 import datetime
@@ -11,6 +12,7 @@ import multiprocessing
 import logging
 import time
 import pandas as pd
+from Bio import SeqIO
 from Bio.Blast.Applications import NcbiblastxCommandline
 from Bio.Blast.Applications import NcbitblastnCommandline
 from Bio.Blast.Applications import NcbitblastxCommandline
@@ -28,6 +30,10 @@ def get_args(DEBUG=False):
     parser.add_argument("-p", "--min_percent", dest="min_percent",
                         help="minimum percent identity",
                         default=85, type=int)
+    parser.add_argument("-m", "--min_genome_length",
+                        dest="min_genome_length",
+                        help="",
+                        default=400, type=int)
     parser.add_argument("-t", "--threads", dest="threads",
                         help="threads to use",
                         default=1, type=int)
@@ -51,12 +57,11 @@ def get_args(DEBUG=False):
     return(args)
 
 
-logger = logging.getLogger('root')
-
 
 def set_up_logging(outdir, level):
     """
     """
+    logger = logging.getLogger('root')
     logger.setLevel(logging.DEBUG)
     # create console handler and set level to given verbosity
     console_err = logging.StreamHandler(sys.stderr)
@@ -122,7 +127,7 @@ def setup_blast_db(input_file, input_type="fasta", dbtype="prot",
 
 
 def make_prot_nuc_recip_blast_cmds(
-        query_list, date,
+        query_list, date, threads, recip_threads,
         output, subject_file=None, logger=None):
     """given a file, make a blast cmd, and return path to output csv
     Only works is query_list is nucleotide and subject_file is protein
@@ -133,10 +138,24 @@ def make_prot_nuc_recip_blast_cmds(
                           os.path.splitext(os.path.basename(subject_file))[0])
     os.makedirs(db_dir, exist_ok=True)
     protdb = os.path.join(db_dir,
-                          os.path.splitext(os.path.basename(subject_file))[0])
+        os.path.splitext(os.path.basename(subject_file))[0])
 
-    setup_blast_db(input_file=args.db_aa, input_type="fasta", dbtype="prot",
-                   out=protdb, logger=logger)
+    nucdb = os.path.join(db_dir, "genomes")
+
+    setup_blast_db(
+        input_file=args.db_aa,
+        input_type="fasta",
+        dbtype="prot",
+        out=protdb, logger=logger)
+
+    setup_blast_db(
+        input_file=os.path.join(os.path.dirname(query_list[0]), "", "*"),
+        input_type="fasta",
+        dbtype="nucl",
+        out=nucdb,
+        logger=logger,
+        title="genome")
+    
     blast_cmds = []
     blast_outputs = []
     recip_blast_outputs = []
@@ -148,7 +167,7 @@ def make_prot_nuc_recip_blast_cmds(
         blast_cline = NcbiblastxCommandline(query=f,
                                             db=protdb, evalue=.001,
                                             outfmt=6, out=output_path_tab)
-        add_params = str(" -num_threads 1 -num_alignments 20")
+        add_params = str(" -num_threads %i -num_alignments 20" % threads)
         blast_command = str(str(blast_cline) + add_params)
         blast_cmds.append(blast_command)
         blast_outputs.append(output_path_tab)
@@ -157,18 +176,18 @@ def make_prot_nuc_recip_blast_cmds(
             os.path.join(output, date) + "_simpleOrtho_results_" +
             "prot_vs_" + os.path.basename(f) + ".tab")
         recip_blast_cline = NcbitblastnCommandline(query=subject_file,
-                                                   subject=f,
+                                                   db=nucdb,
                                                    evalue=.001,
                                                    outfmt=6, out=recip_output_path_tab)
-        recip_blast_command = str(str(recip_blast_cline) + add_params)
+        recip_blast_command = str(str(recip_blast_cline) + str(" -num_threads %i -num_alignments 20" % recip_threads))
         blast_cmds.append(recip_blast_command)
         recip_blast_outputs.append(recip_output_path_tab)
 
-    return(blast_cmds, blast_outputs, recip_blast_outputs)
+    return(blast_cmds, recip_blast_command, blast_outputs, recip_blast_outputs)
 
 
 def make_nuc_nuc_recip_blast_cmds(
-        query_list, date,
+        query_list, date, threads, recip_threads,
         output, subject_file=None, logger=None):
     """given a file, make a blast cmd, and return path to output csv
     Only works is query_list is nucleotide and subject_file is nuc
@@ -184,7 +203,7 @@ def make_nuc_nuc_recip_blast_cmds(
 
     setup_blast_db(input_file=args.db_aa, input_type="fasta", dbtype="nucl",
                    out=protdb, logger=logger, title="gene")
-    setup_blast_db(input_file=os.path.join(args.genomes_dir, "", "*"), input_type="fasta", dbtype="nucl",
+    setup_blast_db(input_file=os.path.join(os.path.dirname(query_list[0]), "", "*"), input_type="fasta", dbtype="nucl",
                    out=nucdb, logger=logger, title="genome")
     blast_cmds = []
     blast_outputs = []
@@ -197,7 +216,7 @@ def make_nuc_nuc_recip_blast_cmds(
         blast_cline = NcbitblastxCommandline(query=f,
                                             db=protdb, evalue=.001,
                                             outfmt=6, out=output_path_tab)
-        add_params = str(" -num_threads 1")
+        add_params = str(" -num_threads %i" % threads)
         blast_command = str(str(blast_cline) + add_params)
         blast_cmds.append(blast_command)
         blast_outputs.append(output_path_tab)
@@ -209,7 +228,7 @@ def make_nuc_nuc_recip_blast_cmds(
                                                db=nucdb,
                                                evalue=.001,
                                                outfmt=6, out=recip_output_path_tab)
-    recip_blast_command = str(str(recip_blast_cline))
+    recip_blast_command = str(str(recip_blast_cline) + str(" -num_threads %i" % recip_threads))
     # blast_cmds.append(recip_blast_command)
     recip_blast_outputs.append(recip_output_path_tab)
 
@@ -389,10 +408,39 @@ def main(args):
     if not os.path.isfile(args.db_aa):
         raise FileNotFoundError("Input file %s not found!" % args.db_aa)
     genomes = get_complete_paths_of_files(args.genomes_dir)
+    print(genomes)
+    if len(genomes) == 1:
+        # if just one genome, lets split it up like an assesmbly into its contigs.  This front-ends some of the issues with massive files, and helps overcome the issue with blast's "num_threads" being next to useless
+        logger.debug("writing out subject as individual sequences")
+        new_genomes_dir = os.path.join(args.output, "split_genome", "")
+        os.makedirs(new_genomes_dir)
+        with open(genomes[0], "r") as inf:
+            fcounter = 0
+            counter = 0
+            for rec in SeqIO.parse(inf, "fasta"):
+                with open(os.path.join(new_genomes_dir, str(fcounter) + ".fasta"), "a") as outf:
+                    if len(rec.seq) > args.min_genome_length:
+                        SeqIO.write(rec, outf, "fasta")
+                        counter = counter + 1
+                        if counter > 100:
+                            fcounter = fcounter + 1
+                            counter = 0
+                    
+        # and then get the paths of the new dir of sequences
+        genomes = get_complete_paths_of_files(new_genomes_dir)
+        
+    logger.debug("Allocating cores")
+    # get cores, etc
+    if args.threads < len(genomes):
+        threads = 1
+    else:
+        threads = math.floor(args.threads / len(genomes))
     if not args.nucleotide:
-        commands, paths_to_outputs, paths_to_recip_outputs = \
+        commands, recip_cmd, paths_to_outputs, paths_to_recip_outputs = \
             make_prot_nuc_recip_blast_cmds(
                 query_list=genomes,
+                threads=threads,
+                recip_threads=args.threads,
                 subject_file=args.db_aa,
                 output=output_root, date=date,
                 logger=logger)
@@ -400,6 +448,8 @@ def main(args):
         commands, recip_cmd, paths_to_outputs, paths_to_recip_outputs = \
             make_nuc_nuc_recip_blast_cmds(
                 query_list=genomes,
+                threads=threads,
+                recip_threads=args.threads,
                 subject_file=args.db_aa,
                 output=output_root, date=date,
                 logger=logger)
@@ -411,10 +461,12 @@ def main(args):
                          "the needed blast results were found. Cannot use " +
                          "this directory")
             sys.exit(1)
+        with open(os.path.join(output_root, "blast_cmds"), "w") as blastf:
+            for cmd in commands:
+                blastf.write(cmd)
         pool = multiprocessing.Pool()
-        logger.debug("Running the following commands in parallel " +
+        logger.debug("Running blast commands in parallel " +
                      "(this could take a while):")
-        logger.debug("\n" + "\n".join([x for x in commands]))
         results = [
             pool.apply_async(subprocess.run,
                              (cmd,),
@@ -427,9 +479,8 @@ def main(args):
         pool.join()
         reslist = []
         reslist.append([r.get() for r in results])
-        recip_cmd_full = recip_cmd + " -num_threads %d" % args.threads
-        logger.debug(recip_cmd_full)
-        subprocess.run(recip_cmd_full,
+        logger.debug(recip_cmd)
+        subprocess.run(recip_cmd,
                        shell=sys.platform != "win32",
                        stdout=subprocess.PIPE,
                        stderr=subprocess.PIPE, check=True)
