@@ -30,7 +30,7 @@ requirements = [str(ir.req) for ir in install_reqs]
 
 setup(
     name='open_utils',
-    version="0.0.1",
+    version="0.0.2",
 
     description="you didn't thing you needed it til you did",
     # long_description=long_description,
@@ -62,7 +62,7 @@ setup(
     entry_points={
        'console_scripts': [
            'extractRegion=extractRegion.extractRegion:main',
-           'snagnblast=snagnblast.snagnblast:main'
+           'snagnblast=virulenceParser.snagnblast.snagnblast:main'
        ],
     },
 )

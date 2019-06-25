@@ -208,7 +208,8 @@ def cleanup_output_to_csv(infile, accession_pattern='(?P<accession>[A-Z _\d]*\.\
 #%%
 
 
-def main(args):
+def main():
+    args = get_args(DEBUG=False)
     logger = logging.getLogger('snagnblast')
     logger.setLevel(logging.DEBUG)
     logger.debug("All settings used:")
@@ -269,5 +270,4 @@ def main(args):
 if __name__ == '__main__':
     assert ((sys.version_info[0] == 3) and (sys.version_info[1] >= 5)), \
         "Must use python3.5 or higher!"
-    args = get_args(DEBUG=False)
-    main(args=args)
+    main()

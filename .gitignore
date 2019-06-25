@@ -10,3 +10,4 @@ dest/
 *.egg-info/
 dist/
 .DS_Store
+*__pycache__/
