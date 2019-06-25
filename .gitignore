@@ -5,3 +5,8 @@
 *~
 *.html
 *.gz
+build/
+dest/
+*.egg-info/
+dist/
+.DS_Store
