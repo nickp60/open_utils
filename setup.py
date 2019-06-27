@@ -30,7 +30,7 @@ requirements = [str(ir.req) for ir in install_reqs]
 
 setup(
     name='open_utils',
-    version="0.0.5",
+    version="0.0.6",
 
     description="you didn't think you needed it til you did",
     # long_description=long_description,

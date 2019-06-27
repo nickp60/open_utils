@@ -105,7 +105,7 @@ def get_args():
 def parse_coords(coords, from_stdin=False, logger=None):
     assert logger is not None, "must use logging"
     coords = coords.replace("'", "")
-    if from_stdin and "@" in coords:
+    if "@" in coords:
         name, coords = coords.split("@")
     else:
         name = ''
