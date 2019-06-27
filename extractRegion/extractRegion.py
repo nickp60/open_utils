@@ -2,9 +2,9 @@
 # -*- coding: utf-8 -*-
 """
 Created on Mon Jul 18 11:44:26 2016
-version 0.6
+version 0.8
 Minor version changes:
- - reads from stdin
+ - fix issue with reverse complimented sequences
 
 TODO:
 
@@ -33,13 +33,15 @@ def get_args():
                         help="start:end or chromosome:start:end; " +
                         "can be read from standard in by using '-'. " +
                         " If reading from " +
-                        "stdin, can take an additional 'name' attribute: " +
+                        "stdin, set to -.  When reading from stdin, " +
+                        " can take an additional 'name' attribute: " +
                         "name@chromosome:start:end;")
-    parser.add_argument("fasta_file", help="input genome")
+    parser.add_argument("-f", "--fasta", dest="fasta_file", help="input genome")
     parser.add_argument("-l", "--list", dest="reglist",
                         help="region list; " +
                         "if you have a lot of regions, this file " +
-                        "will be used instead of the coords arg", default=None)
+                        "will be used instead of the coords arg. " +
+                        "Note this overrides stdin", default=None)
     parser.add_argument("-e", "--extra", dest="extra",
                         help=" Get a region surrounding the region given," +
                         "by this many bases "
@@ -49,9 +51,9 @@ def get_args():
                         "default (false) is to just output to simplify " +
                         "to extracting to the end of the sequence;",
                         action="store_true")
-    parser.add_argument("-q", "--quick", dest="quick",
-                        help="uses the experimental SimpleFastaParser;",
-                        action="store_false", default=True)
+    parser.add_argument("-q", "--slow", dest="slow",
+                        help="dont use the experimental SimpleFastaParser;",
+                        action="store_true")
 
     # parser.add_argument("-s", "--simple", dest="simple",
     #                     help="use a simplified header in output " +
@@ -105,10 +107,9 @@ def qextract_record(path, chrom):
             if chrom in record[0]:
                 return SeqRecord(Seq(record[1]),
                                  id=chrom, description="")
-                # return record
             else:
                 pass
-
+    raise ValueError("{chrom} not found in {path}".format(**locals()))
 
 def extract_record(path, chrom):
     with open(path, "r") as fasta:
@@ -117,21 +118,26 @@ def extract_record(path, chrom):
                 return record
             else:
                 pass
+    raise ValueError("{chrom} not found in {path}".format(**locals()))
 
 
-def check_missing_or_duplicated(fastaids, extids):
+def check_missing_or_duplicated(fastaids, extids, logger=None):
     if extids[0] is None:
         return 0
     for i in extids:
+        i = i.replace("-RC_",  "")
         recs = []
         hits = 0
         for j in fastaids:
-            if i == j:
+            if i.strip() == j.strip():
                 recs.append(i)
                 hits = hits + 1
             else:
                 pass
         if hits == 0:
+            if logger is not None:
+                logger.warn("given id: %s" % i)
+                logger.warn("fasta ids: "  + " ".join(fastaids))
             raise ValueError("No hits found for " + i)
         elif hits > 1:
             raise ValueError("Multiple hits found for "+ i + ":\n"+"\n".join(recs))
@@ -151,21 +157,19 @@ def main():
         logger.debug("{0}: {1}".format(k, v))
 
     COORDS_FROM_STDIN = False
-    logger.debug(os.isatty(0))
-    if args.coords == "-" and args.reglist is None:
-    # if not os.isatty(0) and args.reglist is None:
+    if args.reglist is not None:
+        logger.debug("reading coords from file")
+        coord_string_list = open(args.reglist).readlines()
+        COORDS_FROM_STDIN = True
+    elif args.coords == "-" or args.coords is None:
+        # if not os.isatty(0) and args.reglist is None:
         # with open(args.coords) as c:
         logger.debug("reading from stdin")
         coord_string_list = [sys.stdin.readlines()[0].strip()]
         COORDS_FROM_STDIN = True
     else:
-        if args.reglist is not None:
-            logger.debug("reading coords from file")
-            coord_string_list = open(args.reglist).readlines()
-            COORDS_FROM_STDIN = True
-        else:
-            logger.debug("using coords passed as args")
-            coord_string_list = [args.coords]
+        logger.debug("using coords passed as args")
+        coord_string_list = [args.coords]
     logger.info("processing %s", " ".join(coord_string_list))
     #hold all them names and stuff
     nameChromStartEnd = []
@@ -182,8 +186,10 @@ def main():
             rec_ids.append(str(rec.id + " "))
     logger.debug(rec_ids)
     check_missing_or_duplicated(fastaids=rec_ids,
-                                extids=[x[1] for x in nameChromStartEnd])
+                                extids=[x[1] for x in nameChromStartEnd],
+                                logger=logger)
     nregions = len(nameChromStartEnd)
+    logger.debug("number of reguions to extract: %i" %nregions)
     for idx, ncse in enumerate(nameChromStartEnd):
         logger.debug("processing entry %i of %i:", idx + 1, nregions)
         logger.debug(ncse)
@@ -195,17 +201,17 @@ def main():
             ncse[0] = args.name
         logger.debug("extracting sequence named %s", ncse[1])
         if ncse[1] is not None:
-            if args.quick:
+            if not args.slow:
                 try:
                     record = qextract_record(path=args.fasta_file,
-                                             chrom=ncse[1].strip())
+                                             chrom=ncse[1].strip().replace("-RC_", ""))
                 except Exception as e:
                     logger.error(str(type(e)) + ": " + str(e))
                     sys.exit(1)
             else:
                 try:
                     record = extract_record(path=args.fasta_file,
-                                            chrom=ncse[1].strip())
+                                            chrom=ncse[1].strip().replace("-RC_", ""))
                 except Exception as e:
                     logger.error(str(type(e)) + ": " + str(e))
                     sys.exit(1)
@@ -217,7 +223,6 @@ def main():
                 sys.exit(1)
             else:
                 record = records[0]
-
         ## get the region
         # seqid = "{0}_{1}{2}:{3}".format(record.id, name, start, end)
         if not args.negative:
@@ -228,8 +233,8 @@ def main():
                     coord = len(record.seq)
                 else:
                     pass
-            seqid = "{0}@{1}:{2}:{3}".format(
-            ncse[0], ncse[1], ncse[2], ncse[3])
+        seqid = "{0}@{1}:{2}:{3}".format(
+            ncse[0], ncse[1], ncse[2]+1, ncse[3])  # acount for zero index
         if ncse[0].endswith("-RC_"):
             logger.debug("getting RC")
             try:

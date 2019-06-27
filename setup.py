@@ -30,9 +30,9 @@ requirements = [str(ir.req) for ir in install_reqs]
 
 setup(
     name='open_utils',
-    version="0.0.2",
+    version="0.0.3",
 
-    description="you didn't thing you needed it til you did",
+    description="you didn't think you needed it til you did",
     # long_description=long_description,
     long_description="""
     check out the GitHub
@@ -59,6 +59,8 @@ setup(
     ],
     keywords='bioinformatics evolution genomics development',
     packages=find_packages(),
+    # add stuff to the MANIFEST
+    include_package_data=True,
     entry_points={
        'console_scripts': [
            'extractRegion=extractRegion.extractRegion:main',
