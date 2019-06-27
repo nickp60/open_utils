@@ -1,0 +1,4 @@
+region1@NODE_1_length_778_cov_41.3402:1:10
+region1-RC@NODE_1_length_778_cov_41.3402:1:10
+NODE_1_length_778_cov_41.3402:15:25
+region2-RC@NODE_1_length_778_cov_41.3402:25:40

@@ -2,13 +2,14 @@
 # -*- coding: utf-8 -*-
 """
 Created on Mon Jul 18 11:44:26 2016
-version 0.8
+version 0.9
 Minor version changes:
+ - added better help, remove leading @
  - fix issue with reverse complimented sequences
 
 TODO:
 
-USAGE:
+ USAGE:
  $ python extract_region.py genome.fasta 3:111 > extractedregion.fasta
  $ python extract_region.py genome.fasta chrom1:3:111 > extractedregionfromcontig.fasta
  $ echo "mySuperGene@chrom1:3:111" | xargs extract_region.py genome.fasta  > extractedregionfromcontig.fasta
@@ -24,11 +25,39 @@ from Bio import SeqIO
 from Bio.Seq import Seq
 from Bio.SeqRecord import SeqRecord
 from Bio.SeqIO.FastaIO import SimpleFastaParser
+
+
+def msg():
+    return """
+    # basic use
+    extractRegion -f genome.fasta 3:111
+
+    # specify sequence name, for using multifastas
+    extractRegion -f genome.fasta chrom1:3:111 > myGene.fasta
+
+    # custom name your output region's header
+    extractRegion -f genome.fasta GENE_A@chrom1:3:111 > myGene.fasta
+
+    # end  the name  with -RC to get the reverse complement
+    extractRegion -f genome.fasta GENE_A-RC@chrom1:3:111 > reverse-complimented_myGene.fasta
+
+    # get reverse complement, and read coords input from stdin
+    echo "myGene-RC@chrom1:3:111" | xargs extractRegion -f  genome.fasta  > myGene-RC.fasta
+
+    # read coords from a file containing a  list of regions
+    extractRegion -f  genome.fasta -l myregions.txt  > regions.fasta
+
+
+"""
+
+
 def get_args():
     parser = argparse.ArgumentParser(
-        description="Given a set of coords (and an optional chromosome " +
-        "or contig), extract a region of the genome.  It goes to " +
-        "standard out, which can easily be redirected to a file with '>'")
+        description="Given a set of coords (and an optional chromosome/" +
+        "contig), extract a region of the genome.  It goes to " +
+        "standard out, which can easily be redirected to a file with '>'." +
+        "To get the reverse compliment, name the region and end the " +
+        "name with -RC", usage=msg())
     parser.add_argument('coords', nargs='?', type=str,
                         help="start:end or chromosome:start:end; " +
                         "can be read from standard in by using '-'. " +
@@ -78,7 +107,6 @@ def parse_coords(coords, from_stdin=False, logger=None):
     coords = coords.replace("'", "")
     if from_stdin and "@" in coords:
         name, coords = coords.split("@")
-        name = name + "_"
     else:
         name = ''
     if len(coords.split(":")) == 2:
@@ -235,7 +263,9 @@ def main():
                     pass
         seqid = "{0}@{1}:{2}:{3}".format(
             ncse[0], ncse[1], ncse[2]+1, ncse[3])  # acount for zero index
-        if ncse[0].endswith("-RC_"):
+        if seqid.startswith("@"):
+            seqid = seqid.replace("@", "")
+        if ncse[0].endswith("-RC"):
             logger.debug("getting RC")
             try:
                 subrec = SeqRecord(record.seq[ncse[2]: ncse[3]].reverse_complement(),
