@@ -19,7 +19,7 @@ here = path.abspath(path.dirname(__file__))
 
 
 if sys.version_info <= (3, 0):
-    sys.stderr.write("ERROR: clermontpcr requires Python 3.5 " +
+    sys.stderr.write("ERROR: requires Python 3.5 " +
                      "or above...exiting.\n")
     sys.exit(1)
 
@@ -29,17 +29,17 @@ install_reqs = parse_requirements("requirements.txt",
 requirements = [str(ir.req) for ir in install_reqs]
 
 setup(
-    name='open_utils',
-    version="0.0.6",
+    name='open-utils',
+    version="0.0.7",
 
-    description="you didn't think you needed it til you did",
+    description="Various bioinformatics utilities",
     # long_description=long_description,
     long_description="""
     check out the GitHub
     repo for the real README.md file
     """,
 
-    url='https://github.com/nickp60/EzClermont',
+    url='https://github.com/nickp60/open_utils',
 
     # Author details
     author='Nick Waters',
@@ -65,6 +65,7 @@ setup(
        'console_scripts': [
            'extractRegion=extractRegion.extractRegion:main',
            'snagnblast=virulenceParser.snagnblast.snagnblast:main'
+           'vcfortless=vcfortless.vcfortless.main:main'
        ],
     },
 )
