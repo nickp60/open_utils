@@ -64,7 +64,7 @@ setup(
     entry_points={
        'console_scripts': [
            'extractRegion=extractRegion.extractRegion:main',
-           'snagnblast=virulenceParser.snagnblast.snagnblast:main'
+           'snagnblast=virulenceParser.snagnblast.snagnblast:main',
            'vcfortless=vcfortless.vcfortless.main:main'
        ],
     },
