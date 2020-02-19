@@ -67,7 +67,7 @@ def process_region(args, vcf_data, chrom, start, end, rec, strand, is_locus=Fals
     if is_locus:
         assert rec is not None, "must provide rec for loci"
         assert strand is not None, "must provide feature for loci"
-        nucseq  = rec.seq[start: end]
+        nucseq  = rec.seq[start-1: end]
         if strand == 1:
             nucseqp = nucseq.translate(table=args.trans_table, to_stop=True)
         else:
@@ -93,6 +93,7 @@ def process_region(args, vcf_data, chrom, start, end, rec, strand, is_locus=Fals
                 # end = 10
                 # region seq[5 - 1: 8 - 1 ] + SNP + seq[ SNP : end ]
                 thisseq =  rec.seq[start - 1: pos - 1] + ref +rec.seq[pos : end]
+                assert len(thisseq) == len(nucseq), "bad reconstruction of  reference"
                 if strand == 1:
                     thisseqp = thisseq.translate(table=args.trans_table, to_stop=True)
                 else:
@@ -113,7 +114,7 @@ def process_region(args, vcf_data, chrom, start, end, rec, strand, is_locus=Fals
                         (end - pos) < args.binding_width
                 ):
                     EFF = "PRO"
-                thisres = Result(chrom, pos, "-", "-", 0, "-", 0, EFF)
+                thisres = Result(chrom, pos, ref, alt, 0, thiststv, 0, EFF)
                 sys.stdout.write("%s\t%i\t%s\t%s\t%i\t%s\t%i\t%s\n" % thisres)
 
 
