@@ -74,7 +74,11 @@ def process_region(args, vcf_data, chrom, start, end, rec, strand, is_locus=Fals
             nucseqp = nucseq.reverse_complement().translate(table=args.trans_table, to_stop=True)
 
     these_vcfs = vcf_data[chrom][start: end]
+    ignored = 0
     for pos, ref, altlist, PROCESS in these_vcfs:
+        if len(ref) != 1:
+            ignored = ignored + 1
+            continue
         if not PROCESS:
             continue
         bialleleic = False
@@ -116,7 +120,7 @@ def process_region(args, vcf_data, chrom, start, end, rec, strand, is_locus=Fals
                     EFF = "PRO"
                 thisres = Result(chrom, pos, ref, alt, 0, thiststv, 0, EFF)
                 sys.stdout.write("%s\t%i\t%s\t%s\t%i\t%s\t%i\t%s\n" % thisres)
-
+    return ignored
 
 
 def main(args=None):
@@ -165,6 +169,7 @@ def main(args=None):
 
     last_gene_end = 0
     # first process all the coding sequences, then hit the remaining intergenic loci
+    ignored_positons = 0
     with gbk_open_fun(args.gbk, "r") as ingbk:
         for rec in SeqIO.parse(ingbk, "genbank"):
             thischrom = rec.id.split(".")[0]
@@ -172,23 +177,29 @@ def main(args=None):
             for feat in rec.features:
                 if feat.type not in ["source"]:
                     # process coding region
-                    process_region(args, vcf_data,
-                                   chrom=thischrom,
-                                   start=feat.location.start,
-                                   end=feat.location.end,
-                                   rec=rec,
-                                   strand=feat.strand,
-                                   is_locus=True)
+                    ig = process_region(
+                        args, vcf_data,
+                        chrom=thischrom,
+                        start=feat.location.start,
+                        end=feat.location.end,
+                        rec=rec,
+                        strand=feat.strand,
+                        is_locus=True)
+                    ignored_positons = ignored_positons + ig
                     # process previous intergenic region
-                    process_region(args, vcf_data,
-                                   chrom=thischrom,
-                                   start=last_gene_end,
-                                   end=feat.location.start,
-                                   rec=rec,
-                                   strand=feat.strand,
-                                   is_locus=False)
+                    ig = process_region(
+                        args, vcf_data,
+                        chrom=thischrom,
+                        start=last_gene_end,
+                        end=feat.location.start,
+                        rec=rec,
+                        strand=feat.strand,
+                        is_locus=False)
+                    ignored_positons = ignored_positons + ig
                     # keep track of where the last gene ended
                     last_gene_end = feat.location.end
+    if ignored_positons != 0:
+        sys.stderr.write("ignored %d complex entries\n" %ignored_positons)
 
 if __name__ == '__main__':
     main()
