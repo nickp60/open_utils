@@ -142,7 +142,7 @@ def process_region(args, vcf_data, chrom, start, end, rec, strand, is_locus=Fals
                     print(nucseqp)
                     print(thisseqp)
                 SYN = 1
-                EFF = "TER"
+                EFF = "TRA"
                 if nucseqp != thisseqp:
                     SYN = 0
                     if len(thisseqp) != len(nucseqp):
@@ -152,7 +152,7 @@ def process_region(args, vcf_data, chrom, start, end, rec, strand, is_locus=Fals
                 sys.stdout.write("%s\t%i\t%s\t%s\t%i\t%s\t%i\t%s\n" % thisres)
             else:
                 # process intergenic region
-                EFF = "TRA"
+                EFF = "TER"
                 if (
                         (pos - start) < args.binding_width or
                         (end - pos) < args.binding_width
