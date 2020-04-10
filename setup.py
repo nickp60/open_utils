@@ -66,6 +66,7 @@ setup(
            'extractRegion=extractRegion.extractRegion:main',
            'snagnblast=virulenceParser.snagnblast.snagnblast:main',
            'vcfortless=vcfortless.vcfortless.main:main'
+           'frommsa=frommsa.fm.frommsa:main'
        ],
     },
 )

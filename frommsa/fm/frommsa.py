@@ -22,7 +22,7 @@ def get_args():
     return(parser.parse_args())
 
 
-if __name__ == "__main__":
+def main():
     args = get_args()
     outname=args.msa.replace('.msa', '.phy')
     with open(args.msa, "r") as inf:
@@ -33,3 +33,7 @@ if __name__ == "__main__":
         else:
             with open(args.outfile, "w") as outf:
                 AlignIO.write(alignments, outf, args.outfmt)
+
+
+if __name__ == "__main__":
+    main()
