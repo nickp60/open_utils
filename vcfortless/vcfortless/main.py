@@ -44,7 +44,7 @@ def tvts(ref, alt):
     valid = ["A", "T", "C", "G"]
     for nuc in [ref, alt]:
         if nuc not in valid:
-            sys.stderr.write("Non-standard nucleotide: %s" % nuc)
+            sys.stderr.write("Non-standard nucleotide: %s\n" % nuc)
             return ("x")
     refs = {
         "A": {"A": "-",
@@ -80,7 +80,7 @@ def subs_nuc(refseq, start, end, pos, alt):
     thisseq =  refseq[start : pos ] + alt +refseq[pos + 1  : end ]
     # print(refseq[start: end])
     # print(thisseq)
-    assert len(thisseq) == len(refseq[start: end]), "bad reconstruction of  reference"
+    assert len(thisseq) == len(refseq[start: end]), "bad reconstruction of  reference; ref length is %i and reconstructed length is %i" %(len(refseq[start: end]), len(thisseq))
     return thisseq
 
 def test_subs_nuc_psc():
@@ -125,10 +125,17 @@ def process_region(args, vcf_data, chrom, start, end, rec, strand, is_locus=Fals
             biallelic = True
 
         for alt in altlist:
+            if len(alt) > 1:
+                ignored = ignored + 1
+                continue
             thiststv = tvts(ref, str(alt))
             if is_locus:
-                thisseq = subs_nuc(rec.seq, start, end, pos, str(alt))
-
+                try:
+                    thisseq = subs_nuc(rec.seq, start, end, pos, str(alt))
+                except AssertionError:
+                    sys.stderr.write("start: %i; end %i; pos: %i ; alt: %s\n" %(start, end, pos, str(alt)))
+                    sys.exit(1)
+                
                 assert len(thisseq) == len(nucseq), "bad reconstruction of  reference"
                 if strand == 1:
                     thisseqp = thisseq.translate(table=args.trans_table, to_stop=True)
@@ -191,21 +198,27 @@ def main(args=None):
     sys.stderr.write("Reading in vcf\n")
     # we do this weird counter thing so that we have an entry for each position in the genome
     # its a dumb idea until you have to deal with subsets of this list, in which case trading off the ram for the speed
-    #
-    counter = 1
+
+    # 
+    prev_pos = 0  # we keep track of previous position se we know when to reset the counter for new contigs
     for i, v in enumerate(vcf_reader):
         # if (i % 1000) == 0:
         #     sys.stderr.write(str(i) + " ")
+        # here wer set to counter 
+        if v.POS < prev_pos or i == 0:
+            counter = 1
         if v.POS > 200000000:
-            sys.stderr.write("Warning: long sequence detected, only processing the first 20M")
+            sys.stderr.write("Warning: long sequence detected, only processing the first 20Mb")
             break
+        # this pads out for the non-snp regions
         while counter != v.POS and counter < v.POS:
             vcf_data[v.CHROM].append([counter, "-", "-", False])
             counter = counter + 1
-        assert counter == v.POS, "error syncing counters"
+        assert counter == v.POS, "error syncing counters;\n -chrom: %s \n-position: %i \n -previous: %i \n -counter: %i" % (v.CHROM, v.POS, prev_pos, counter)
         # make 0-indexed
         vcf_data[v.CHROM].append([v.POS-1, v.REF, v.ALT, True])
         counter = counter + 1
+        prev_pos = v.POS
     last_gene_end = 0
     # first process all the coding sequences, then hit the remaining intergenic loci
     ignored_positons = 0
