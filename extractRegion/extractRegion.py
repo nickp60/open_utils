@@ -193,7 +193,11 @@ def main():
         # if not os.isatty(0) and args.reglist is None:
         # with open(args.coords) as c:
         logger.debug("reading from stdin")
-        coord_string_list = [sys.stdin.readlines()[0].strip()]
+        try:
+            coord_string_list = [sys.stdin.readlines()[0].strip()]
+        except IndexError:
+            logger.warning("stdin is empty; exiting with code 0.")
+            sys.exit(0)
         COORDS_FROM_STDIN = True
     else:
         logger.debug("using coords passed as args")
